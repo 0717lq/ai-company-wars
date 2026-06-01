@@ -1,0 +1,21 @@
+{
+  "//note": "round.json — 真实场景示例",
+  "//scenario": "红队已走到 DevOps 完成，蓝队 Dev 还在进行中，Round 状态为 DEVELOPMENT（等待蓝队 Dev 完成）",
+
+  "round_id": "2026-week-22",
+  "created_at": "2026-05-25T09:00:00+08:00",
+  "current_state": "DEVELOPMENT",
+
+  "teams": {
+    "red": {
+      "status": "in_progress"
+    },
+    "blue": {
+      "status": "in_progress"
+    }
+  },
+
+  "judge_status": "pending",
+
+  "updated_at": "2026-05-25T16:30:00+08:00"
+}

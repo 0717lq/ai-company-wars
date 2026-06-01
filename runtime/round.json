@@ -1,0 +1,15 @@
+{
+  "round_id": "2026-round-7",
+  "created_at": "2026-06-01T03:35:15.754166+00:00",
+  "current_state": "ROUND_CLOSED",
+  "teams": {
+    "red": {
+      "status": "pending"
+    },
+    "blue": {
+      "status": "pending"
+    }
+  },
+  "judge_status": "completed",
+  "updated_at": "2026-06-01T04:09:06.464331+00:00"
+}

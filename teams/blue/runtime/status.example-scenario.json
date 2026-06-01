@@ -1,0 +1,47 @@
+{
+  "//note": "teams/blue/runtime/status.json — 真实场景，蓝队 Dev 遇到测试失败",
+
+  "round_id": "2026-week-22",
+  "team": "blue",
+
+  "current_state": "in_progress",
+
+  "roles": {
+    "product": {
+      "status": "completed",
+      "last_run": "2026-05-25T09:25:00+08:00",
+      "error": null,
+      "outputs": [
+        "teams/blue/artifacts/prd/2026-05-25-feature-prd.md",
+        "teams/blue/artifacts/tasks.md",
+        "teams/blue/artifacts/handover-to-dev.md"
+      ]
+    },
+    "dev": {
+      "status": "failed",
+      "last_run": "2026-05-25T11:30:00+08:00",
+      "error": "Test failure: test_cli.py::test_sort_path — AssertionError: expected 'sorted' but got error exit code 1. CI pipeline blocked.",
+      "outputs": [
+        "teams/blue/project/src/"
+      ]
+    },
+    "devops": {
+      "status": "blocked",
+      "last_run": null,
+      "error": "Dev status is 'failed', cannot proceed until Dev is re-run",
+      "outputs": []
+    },
+    "growth": {
+      "status": "pending",
+      "last_run": null,
+      "error": null,
+      "outputs": []
+    }
+  },
+
+  "latest_artifacts": {
+    "prd": "teams/blue/artifacts/prd/2026-05-25-feature-prd.md"
+  },
+
+  "updated_at": "2026-05-25T11:30:00+08:00"
+}

@@ -1,0 +1,53 @@
+{
+  "//note": "teams/red/runtime/status.json — 真实场景，红队已到 DevOps 完成，等待 Growth",
+
+  "round_id": "2026-week-22",
+  "team": "red",
+
+  "current_state": "in_progress",
+
+  "roles": {
+    "product": {
+      "status": "completed",
+      "last_run": "2026-05-25T09:20:00+08:00",
+      "error": null,
+      "outputs": [
+        "teams/red/artifacts/prd/2026-05-25-update-prd.md",
+        "teams/red/artifacts/tasks.md",
+        "teams/red/artifacts/handover-to-dev.md"
+      ]
+    },
+    "dev": {
+      "status": "completed",
+      "last_run": "2026-05-25T10:50:00+08:00",
+      "error": null,
+      "outputs": [
+        "teams/red/project/src/",
+        "teams/red/artifacts/ready-for-deploy.md"
+      ]
+    },
+    "devops": {
+      "status": "completed",
+      "last_run": "2026-05-25T16:15:00+08:00",
+      "error": null,
+      "outputs": [
+        "git push",
+        "git tag v0.2.0",
+        "teams/red/artifacts/release-notes.md"
+      ]
+    },
+    "growth": {
+      "status": "pending",
+      "last_run": null,
+      "error": null,
+      "outputs": []
+    }
+  },
+
+  "latest_artifacts": {
+    "prd": "teams/red/artifacts/prd/2026-05-25-update-prd.md",
+    "release_notes": "teams/red/artifacts/release-notes.md"
+  },
+
+  "updated_at": "2026-05-25T16:15:00+08:00"
+}

@@ -1,0 +1,46 @@
+{
+  "round_id": "2026-round-7",
+  "team": "red",
+  "current_state": "in_progress",
+  "roles": {
+    "product": {
+      "status": "completed",
+      "last_run": "2026-06-01T03:40:13.068812+00:00",
+      "error": null,
+      "outputs": []
+    },
+    "dev": {
+      "status": "completed",
+      "last_run": "2026-06-01T03:48:48.520697+00:00",
+      "error": null,
+      "outputs": []
+    },
+    "devops": {
+      "status": "completed",
+      "last_run": "2026-06-01T03:58:20.009941+00:00",
+      "error": null,
+      "outputs": []
+    },
+    "growth": {
+      "status": "completed",
+      "last_run": "2026-06-01T04:01:11.570566+00:00",
+      "error": null,
+      "outputs": []
+    },
+    "judge": {
+      "status": "in_progress",
+      "last_run": "2026-06-01T04:04:38.270550+00:00",
+      "error": null,
+      "outputs": []
+    }
+  },
+  "circuit_breaker": {
+    "consecutive_qa_failures": 0,
+    "threshold": 3,
+    "blocked": false,
+    "reason": null
+  },
+  "latest_artifacts": {},
+  "updated_at": "2026-06-01T04:04:38.270556+00:00",
+  "_start_ms": 1780286678270
+}

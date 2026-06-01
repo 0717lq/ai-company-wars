@@ -1,5 +1,10 @@
 # AI Company Wars — 总体规划
 
+> 最后更新：2026-05-18（第 2 轮审计后统一口径）
+> 性质：**总体规划文档**（部分内容已实现，部分仍为规划。标注 ⏳ 的为待完成项）
+
+---
+
 ## 一句话
 
 两个 AI 公司（红队、蓝队），各 4 个 Hermes Agent，零人工干预，自主写代码建项目竞争 GitHub Stars。
@@ -30,8 +35,8 @@
 |-------|------|
 | **Product** | 市场调研 → 选方向 → 写 PRD → 拆任务 |
 | **Dev** | 编码实现 → 写测试 → 修 Bug |
-| **Growth** | GitHub README → 项目展示优化 → Star 增长策略 |
 | **DevOps** | 环境搭建 → CI/CD → Release → 部署 |
+| **Growth** | GitHub README → 项目展示优化 → Star 增长策略 |
 | **Judge** | 跨队评估代码质量 → 统计 Stars → 出排行榜 |
 
 ---
@@ -55,25 +60,32 @@
 
 ## 三、Agent 通信协议
 
-所有 Agent 通过**文件系统 + 共享状态**通信，不搞复杂的网络协议：
+所有 Agent 通过**文件系统 + 共享状态**通信，不搞复杂的网络协议。
+
+### 实际目录结构（2026-05-18 现状）
 
 ```
-workspace/
-├── shared/                  # 共享区
-│   ├── rules.md             # 竞赛规则（裁判写入）
-│   ├── leaderboard.md       # 排行榜（裁判更新）
-│   └── announcements/       # 通告
-├── red/
-│   ├── project/             # 红队开发的产品代码
-│   ├── memory/              # 红队记忆文件
-│   │   ├── MEMORY.md
-│   │   └── SKILLS/
-│   └── artifacts/           # 产出物（PRD、设计文档）
-└── blue/
-    ├── project/
-    ├── memory/
-    └── artifacts/
+ai-company-wars/
+├── shared/                  # 共享区（两队只读）
+│   ├── rules.md             # 竞赛规则（Judge 写入）
+│   ├── leaderboard.md       # 排行榜（Judge 更新）
+│   ├── announcements/       # 通告（Judge 写入）
+│   ├── protocol.md          # 通信协议
+│   └── judge/               # Judge 记忆
+├── teams/
+│   ├── red/
+│   │   ├── project/         # 【正式运行】红队产品代码（独立 Git 仓库）
+│   │   ├── memory/          # 红队 Agent 记忆
+│   │   │   ├── product/MEMORY.md + diary/
+│   │   │   ├── dev/MEMORY.md + diary/
+│   │   │   ├── devops/MEMORY.md + diary/
+│   │   │   └── growth/MEMORY.md + diary/
+│   │   └── artifacts/       # 产出物（PRD、任务、Release Notes）
+│   └── blue/                # 同上结构
+└── orchestrator/            # 调度配置
 ```
+
+> **注：** 正式运行代码路径为 `teams/{color}/project/`。根目录下的 `red-project/`、`blue-project/` 是镜像副本，非正式运行目录。
 
 ---
 
@@ -81,62 +93,64 @@ workspace/
 
 ### 调度器（Orchestrator）
 
-用 **cronjob** 机制驱动每轮的 Agent 调度：
+用 Hermes **cronjob** 机制驱动每轮的 Agent 调度。详见 `orchestrator/setup-cron.sh`：
 
 ```
-cronjob 1 (每日 09:00) → Product Agent: 出本轮规划
-cronjob 2 (每日 10:00) → Dev Agent: 开始编码
-cronjob 3 (每日 16:00) → DevOps Agent: 测试+部署
-cronjob 4 (每日 18:00) → Growth Agent: 优化展示
-cronjob 5 (每周日 20:00) → Judge Agent: 评分
+⏳ cronjob (周一 09:00) → Product Agent: 出本轮规划（Skill: ai-company-wars-product）
+⏳ cronjob (周一 10:00) → Dev Agent: 开始编码（Skill: ai-company-wars-dev）
+⏳ cronjob (周五 16:00) → DevOps Agent: 测试+部署（Skill: ai-company-wars-devops）
+⏳ cronjob (周五 18:00) → Growth Agent: 优化展示（Skill: ai-company-wars-growth）
+⏳ cronjob (周日 20:00) → Judge Agent: 评分（Skill: ai-company-wars-judge）
 ```
 
-每个 cronjob 加载对应 Agent 的 Skills + 记忆，自主决策。
+> ⏳ 标注表示 cronjob 尚未创建（需先修复 skill 名称匹配问题）。
 
 ### Agent 持久化
 
 每个 Agent 有自己的：
 - **MEMORY.md** — 个人记忆
-- **SKILL.md** — 积累的技能（通过 skill_manage 持久化）
 - **日记/反思** — 每轮结束写总结
 
 ### GitHub 集成
 
-- 每队各一个 GitHub 仓库（自动创建）
-- DevOps Agent 通过 `gh CLI` 管理 PR、Release
-- Judge Agent 通过 GitHub API 拉 Stars 数据
+- 每队各一个 GitHub 仓库（已创建）
+- DevOps Agent 通过 `gh CLI` 或 GitHub API 管理 Release
+- Judge Agent 通过本地文件评估
 
 ---
 
-## 五、MVP 路线
+## 五、✅ 已完成 / 📋 待完成
 
-### Phase 1 — 基础设施
-- [ ] 搭建项目骨架（目录结构、共享协议）
-- [ ] 实现 Orchestrator 调度脚本
-- [ ] 初始化红蓝两队 workspace
-- [ ] 创建 GitHub 仓库
+### Phase 1 — 基础设施 ✅
+- [x] 搭建项目骨架（目录结构、共享协议）
+- [x] 实现 Orchestrator 调度脚本
+- [x] 初始化红蓝两队 workspace
+- [x] 创建 GitHub 仓库
 
-### Phase 2 — Agent 角色实现
-- [ ] Product Agent Skills（市场调研、写 PRD）
-- [ ] Dev Agent Skills（编码、测试）
-- [ ] Growth Agent Skills（README、SEO）
-- [ ] DevOps Agent Skills（CI/CD、发版）
-- [ ] Judge Agent Skills（评分算法）
+### Phase 2 — Agent 角色实现 ✅
+- [x] Hermes Skill（5 个：product / dev / devops / growth / judge）
+- [x] 红蓝两队首轮开发（dirsort / fclean）
+- [x] 首轮 Release + README 优化
 
-### Phase 3 — 试运行
+### Phase 3 — 结构统一（进行中）
+- [ ] 真源收口 + 文档统一 ✅（本轮）
+- [ ] Skill 契约补齐（INPUTS/OUTPUTS/CHECKS）📋
+- [ ] 状态机与结构化状态文件 📋
+
+### Phase 4 — 试运行（📋 后续）
 - [ ] 跑 1-2 轮，观察 Agent 表现
 - [ ] 调优 prompt/Skills
 - [ ] 验证零人工干预
 
-### Phase 4 — 正式竞赛
+### Phase 5 — 正式竞赛（📋 后续）
 - [ ] 长期运行，自动迭代
 - [ ] 可视化排行榜（Web 界面？）
 
 ---
 
-## 六、需要你确认的点
+## 六、设计原则
 
-1. **每轮周期** — 建议 1 周一轮，还是更短（3 天）？
-2. **项目类型** — 两队自己做同一类型的项目竞争，还是自由发挥？
-3. **GitHub 账号** — 用你的账号还是单独创建机器人账号？
-4. **Stars 目标** — 纯竞争看谁多，还是设具体的 KPI（比如四周内达到 100 Stars）？
+1. **先统一真源和文档，再改流程**
+2. **先做最小可运行闭环，再做增强**
+3. **不要同时改太多方向**
+4. **优先保证可维护性、可理解性、可补跑**

@@ -1,0 +1,35 @@
+{
+  "//schema": "round.json — 整轮比赛状态",
+  "//version": "1.0",
+  "//note": "每个 round_id 对应一个 Sprint 轮次",
+
+  "round_id": "2026-week-21",
+  "created_at": "2026-05-18T09:00:00+08:00",
+  "current_state": "ROUND_CREATED",
+  "//current_state_enum": "ROUND_CREATED | PLANNING | DEVELOPMENT | RELEASING | PROMOTING | JUDGING | ROUND_CLOSED",
+
+  "teams": {
+    "red": {
+      "status": "pending",
+      "//status_enum": "pending | in_progress | completed | failed | blocked"
+    },
+    "blue": {
+      "status": "pending"
+    }
+  },
+
+  "judge_status": "pending",
+  "//judge_status_enum": "pending | in_progress | completed | failed",
+
+  "updated_at": "2026-05-18T09:00:00+08:00",
+
+  "//table": "状态推进对照表",
+  "//round_to_team": {
+    "PLANNING": "检查 product 是否全部结束",
+    "DEVELOPMENT": "检查 dev 是否全部结束",
+    "RELEASING": "检查 devops 是否全部结束",
+    "PROMOTING": "检查 growth 是否全部结束",
+    "JUDGING": "检查 judge 是否完成"
+  },
+  "//team_completion_logic": "team 某个角色的结束 = completed / failed / skipped 均视为该角色已结束。只有 in_progress 和 pending 视为未结束。"
+}

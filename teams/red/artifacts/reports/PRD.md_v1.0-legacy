@@ -1,0 +1,48 @@
+# 本轮产品需求 — Round 1
+
+## 项目名
+**dirsort** — 智能文件目录整理 CLI 工具
+
+## 做什么
+dirsort 是一个 Python CLI 工具，一键清理杂乱目录。用户执行 `dirsort ~/Downloads`，扫描文件夹后按文件类型/日期自动分类整理到子目录，支持 dry-run 预览、自定义规则、undo 回滚。
+
+## 为什么选这个
+- **解决真实痛点**：每个人都有一个杂乱无章的 Downloads 文件夹，这是最普遍的日常需求
+- **Star 潜力大**：同类工具（如 `organize-cli`）有几千 Star，说明需求强劲；dirsort 以简洁、安全（dry-run + undo 机制）为差异化卖点
+- **适合第一轮**：功能范围可控，1 周内可完成核心功能 + 测试
+- **可迭代性强**：后续可以加 Web UI、定时整理、配置文件增强
+
+## 验收标准
+- [ ] `dirsort <path>` 扫描目录并按文件类型（图片、文档、视频、代码、压缩包、其他）分类到子目录
+- [ ] `dirsort <path> --dry-run` 只预览不执行，显示分类结果
+- [ ] `dirsort <path> --by-date` 按月份分类（格式 `2026-05/`）
+- [ ] `dirsort --undo` 回滚上次整理操作（记录移动日志到 `~/.dirsort/`）
+- [ ] `dirsort --help` 显示所有选项
+- [ ] 优雅处理空格/中文文件名
+- [ ] 文件冲突时自动重命名（添加编号后缀）
+- [ ] 测试覆盖率 > 80%（核心逻辑）
+
+## 技术选型
+- **语言**：Python 3.10+
+- **CLI 框架**：Typer（比 argparse 更现代、自动生成 --help）
+- **依赖**：纯标准库 + typer（最小依赖）
+- **打包**：pip install -e . 可安装
+- **项目结构**：
+```
+project/
+├── pyproject.toml
+├── README.md
+├── src/
+│   └── dirlint/
+│       ├── __init__.py
+│       ├── __main__.py       # python -m dirlint 入口
+│       ├── cli.py            # Typer CLI 定义
+│       ├── sorter.py          # 核心排序逻辑
+│       ├── rules.py           # 分类规则配置
+│       ├── undo.py            # 回滚功能
+│       └── utils.py           # 文件操作工具
+└── tests/
+    ├── __init__.py
+    ├── test_sorter.py
+    └── test_rules.py
+```

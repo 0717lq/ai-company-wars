@@ -1,0 +1,40 @@
+# Sprint 任务 — Round 1: dirlint
+
+## 优先级 P0（必须完成——MVP 核心）
+| ID | 任务 | 预估工时 | 文件 |
+|----|------|---------|------|
+| P0-1 | 创建 Python 包骨架（pyproject.toml, src/layout, tests/layout） | 30min | `pyproject.toml`, `src/dirlint/*` |
+| P0-2 | 实现 `sorter.py`：按文件类型分类的核心逻辑（图片/文档/视频/代码/压缩包/其他） | 2h | `src/dirlint/sorter.py` |
+| P0-3 | 实现 `cli.py`：Typer CLI，支持 `dirsort <path>` 和 `--dry-run` | 1h | `src/dirlint/cli.py` |
+| P0-4 | 实现文件移动逻辑：创建目标目录、移动文件、冲突自动重命名 | 1.5h | `src/dirlint/utils.py` |
+| P0-5 | 实现 `--by-date` 按月份分类 | 1h | `src/dirlint/sorter.py` |
+| P0-6 | 实现 `--undo` 回滚功能（移动日志持久化到 `~/.dirsort/`） | 1.5h | `src/dirlint/undo.py` |
+| P0-7 | 测试 P0 核心逻辑（测试 > 80% 覆盖率） | 2h | `tests/test_sorter.py`, `tests/test_rules.py` |
+
+## 优先级 P1（体验完善）
+| ID | 任务 | 预估工时 | 文件 |
+|----|------|---------|------|
+| P1-1 | 实现 `rules.py`：可配置的分类规则（文件后缀映射到类别） | 1h | `src/dirlint/rules.py` |
+| P1-2 | 支持 `__main__.py` 使 `python -m dirlint` 可运行 | 15min | `src/dirlint/__main__.py` |
+| P1-3 | 完善 `--help` 输出和错误处理 | 30min | `src/dirlint/cli.py` |
+
+## 优先级 P2（如果时间有余）
+| ID | 任务 | 预估工时 |
+|----|------|---------|
+| P2-1 | 添加进度条（tqdm）显示移动进度 | 30min |
+| P2-2 | 添加 `--stats` 模式：只统计不移动，显示各类文件数量 | 30min |
+
+## 交付物清单
+- [ ] `teams/red/project/src/dirlint/__init__.py`
+- [ ] `teams/red/project/src/dirlint/__main__.py`
+- [ ] `teams/red/project/src/dirlint/cli.py`
+- [ ] `teams/red/project/src/dirlint/sorter.py`
+- [ ] `teams/red/project/src/dirlint/rules.py`
+- [ ] `teams/red/project/src/dirlint/undo.py`
+- [ ] `teams/red/project/src/dirlint/utils.py`
+- [ ] `teams/red/project/pyproject.toml`
+- [ ] `teams/red/project/tests/test_sorter.py`
+- [ ] `teams/red/project/tests/test_rules.py`
+- [ ] `teams/red/project/README.md`
+- [ ] 所有测试通过
+- [ ] `pip install -e .` 可安装
