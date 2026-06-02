@@ -761,6 +761,10 @@ def advance(dry_run: bool = False, stuck_threshold: int = DEFAULT_STUCK_THRESHOL
     log(f"=== ACW Executor 完成 | 执行了 {len(phases_executed)} 个阶段, "
         f"{summary['success_count']} 成功, {summary['fail_count']} 失败 ===")
 
+    # 轮次结束后自动 commit + push 主仓库
+    if not dry_run and phases_executed:
+        _sync_main_repo(round_id)
+
     return summary
 
 
@@ -772,6 +776,76 @@ def _retry_role(team: str, role: str, round_id: str):
         log(f"[{team}/{role}] 已重置 (retry)")
     except Exception as e:
         log(f"[{team}/{role}] 重置失败: {e}")
+
+
+def _sync_main_repo(round_id: str):
+    """轮次结束后自动 commit + push 主仓库"""
+    log("📦 同步主仓库到 GitHub...")
+    try:
+        # git add -A
+        subprocess.run(["git", "add", "-A"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+
+        # 检查是否有变更
+        proc = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+        if not proc.stdout.strip():
+            log("📦 主仓库无变更，跳过")
+            return
+
+        # git commit
+        msg = f"Round {round_id} 自动同步"
+        subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+
+        # git push（用 token）
+        token = _get_token()
+        if not token:
+            log("📦 ⚠️ 无 GitHub token，跳过 push")
+            return
+
+        # 获取当前 remote URL
+        url_proc = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+        original_url = url_proc.stdout.strip()
+        if not original_url:
+            log("📦 ⚠️ 无 origin remote，跳过 push")
+            return
+
+        # 嵌入 token push
+        if original_url.startswith("https://"):
+            auth_url = original_url.replace("https://", f"https://{token}@")
+        else:
+            auth_url = original_url
+
+        subprocess.run(["git", "remote", "set-url", "origin", auth_url], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+        push_proc = subprocess.run(["git", "push", "origin", "master"], capture_output=True, text=True, timeout=120, cwd=BASE_DIR)
+        subprocess.run(["git", "remote", "set-url", "origin", original_url], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+
+        if push_proc.returncode == 0:
+            log("📦 ✅ 主仓库已同步到 GitHub")
+        else:
+            log(f"📦 ⚠️ push 失败: {push_proc.stderr[-200:]}")
+    except Exception as e:
+        log(f"📦 ⚠️ 同步异常: {e}")
+
+
+def _get_token() -> str:
+    """获取 GitHub token"""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN_Classic")
+    if not token:
+        env_file = os.path.expanduser("~/.hermes/.env")
+        if os.path.exists(env_file):
+            for line in open(env_file):
+                if line.startswith("GITHUB_TOKEN=") and not line.startswith("#"):
+                    token = line.strip().split("=", 1)[1]
+                    break
+    if not token:
+        try:
+            proc = subprocess.run(
+                ["powershell.exe", "-Command", "[Environment]::GetEnvironmentVariable('GITHUB_TOKEN_Classic', 'User')"],
+                capture_output=True, text=True, timeout=10,
+            )
+            token = proc.stdout.strip().replace("\r", "").replace("\n", "")
+        except Exception:
+            pass
+    return token or ""
 
 
 def _force_advance_round(round_data: dict):
