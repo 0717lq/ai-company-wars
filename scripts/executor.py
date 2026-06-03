@@ -519,10 +519,18 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
     log(f"[{team}/{role}] 执行中 (skill: {skill}){'[preview]' if preview else ''}...")
     start = time.time()
 
+    # 轮次上下文（每轮不同的项目方向）
+    ROUND_CONTEXT = {
+        "2026-round-8": "本轮方向：开发一个 RAG（检索增强生成）相关的 Hermes Agent 技能。技能应帮助用户构建或优化 RAG 系统，例如：PDF 解析、向量检索、混合检索、Reranker 精排、查询分解等。产出是一个完整的 SKILL.md 文件，可直接安装到 Hermes Agent 使用。",
+    }
+    round_context = ROUND_CONTEXT.get(round_id, "")
+
     prompt = f"""你是 AI Company Wars 的 {role} 角色。
 队伍: {team}
 轮次: {round_id}
 项目路径: {os.path.join(BASE_DIR, 'teams', team, 'project')}
+
+{round_context}
 
 请加载 {skill} 技能并执行你的职责。{extra}"""
 
