@@ -1,88 +1,70 @@
-# fclean v0.5.0 — Sprint 6 任务清单（Round 6 重试更新）
+# Sprint 9 任务清单 — rag-builder v0.2.0
 
-> 日期：2026-05-31
-> PRD：artifacts/prd/2026-05-30-fclean-r6-prd.md
-> 状态更新：T5/T6 源码已完成；基础设施（Docker/CI/PyPI/Pre-commit）全部就绪
-> 竞品动态：红队 dirsort v0.6.0 已发布（插件系统+ASCII图表+Top-N）
-
----
-
-## P0 — 必须完成（MVP 核心）
-
-### T1: PyPI 发布配置 ✅ 已就绪
-- **状态**：publish.yml 已存在，pyproject.toml 元数据完整
-- **剩余**：DevOps 需要在 PyPI 创建项目 + 配置 Trusted Publisher
-
-### T2: Docker 容器化 ✅ 已就绪
-- **状态**：Dockerfile 已存在（python:3.12-slim），CI 含 Docker build 测试
-
-### T3: Pre-commit Hook ✅ 已就绪
-- **状态**：.pre-commit-hooks.yaml 已存在
-
-### T4: 版本号确认 + CHANGELOG ⬜
-- **内容**：确认 pyproject.toml version=0.5.0，CHANGELOG.md 新增 v0.5.0 完整条目
-- **涉及文件**：`pyproject.toml`, `CHANGELOG.md`
-- **验收**：`fclean --version` 输出 0.5.0；CHANGELOG 含所有新功能
-- **预估**：15min
-
-### T5: .fcleanignore 测试 ⬜
-- **内容**：编写 test_ignore.py，覆盖 glob 模式、取反规则、目录模式
-- **涉及文件**：`tests/test_ignore.py`
-- **验收**：测试覆盖 *.log、**/*.tmp、!important.log、目录后缀等场景
-- **预估**：30min
-
-### T6: fclean watch 测试 ⬜
-- **内容**：编写 test_watcher.py，测试 watchdog 监听、防抖、忽略规则集成
-- **涉及文件**：`tests/test_watcher.py`
-- **验收**：测试覆盖新文件触发 organize、.fcleanignore 过滤、优雅退出
-- **预估**：30min
+> 更新时间：2026-06-03
+> 项目：rag-builder
+> 团队：Blue
 
 ---
 
-## P1 — 体验完善（回应红队 v0.6.0）
+## P0（必须完成 — MVP 核心）
 
-### T7: stats 可视化增强 🆕
-- **内容**：`fclean stats --chart` 输出 ASCII 饼图/柱状图，可视化文件类型分布
-- **涉及文件**：`src/fclean/cli.py`（新增 --chart 参数），`src/fclean/stats_viz.py`（新增）
-- **验收**：`fclean stats --chart ~/Downloads` 输出 ASCII 饼图；`--json` 模式忽略 --chart
-- **预估**：1h
-- **竞品对标**：红队 dirsort v0.6.0 的 stats_enhanced.py
+### T1: Embedding 抽象层
+- **文件**: `src/rag_builder/embeddings.py`（新增）
+- **内容**: `EmbeddingProvider` 抽象基类 + `STProvider`（sentence-transformers）+ `OpenAIProvider`（OpenAI 兼容 API）+ `get_provider()` 工厂函数
+- **接口**: `embed_texts(texts: list[str]) -> list[list[float]]`，支持 batch_size、normalize、device 参数
+- **预估**: 150 行
 
-### T8: stats 大文件 Top-N 🆕
-- **内容**：`fclean stats --top N` 列出占用空间最大的 N 个文件
-- **涉及文件**：`src/fclean/cli.py`（新增 --top 参数），`src/fclean/stats_viz.py`
-- **验收**：`fclean stats --top 10 ~/Downloads` 输出文件名+大小排序列表
-- **预估**：30min
-- **竞品对标**：红队 dirsort v0.6.0 的 `dirsort stats --top 10`
+### T2: 向量存储连接器
+- **文件**: `src/rag_builder/vector_store.py`（新增）
+- **内容**: `VectorStore` 抽象基类 + `MilvusStore` + `ChromaStore` + `get_store()` 工厂函数
+- **接口**: `add(ids, texts, embeddings, metadata)` / `search(embedding, top_k)` / `delete(ids)` / `count()`
+- **预估**: 200 行
 
-### T9: README 更新 ⬜
-- **内容**：确认 README 包含 watch/ignore/Docker/Pre-commit/stats chart 章节
-- **涉及文件**：`README.md`
-- **验收**：README 包含所有新功能使用示例；对比表更新（红队已有 --json/Docker/Pre-commit）
-- **预估**：1h
+### T3: 文档解析器
+- **文件**: `src/rag_builder/parsers.py`（新增）
+- **内容**: `parse_pdf(path)` → list[dict]（pymupdf）+ `parse_markdown(path)` → list[dict] + `parse_directory(path)` → list[dict] + `chunk_text(text, strategy, chunk_size, overlap)` 分块器
+- **预估**: 150 行
+
+### T4: 混合检索器
+- **文件**: `src/rag_builder/retriever.py`（新增）
+- **内容**: `HybridRetriever` 类，组合 BM25 + 向量检索，RRF 融合排序
+- **接口**: `index(documents)` / `search(query, top_k)` → list[dict]，可选 reranker
+- **预估**: 150 行
+
+### T5: CLI 扩展 — ingest/query 子命令
+- **文件**: `src/rag_builder/cli.py`（更新）
+- **内容**: `rag-builder ingest <dir> --config <json>` 调用 parsers → embeddings → vector_store 完成入库；`rag-builder query "问题" --config <json>` 调用 retriever 完成检索
+- **预估**: 100 行增量
+
+### T6: 测试
+- **文件**: `tests/test_embeddings.py`, `tests/test_vector_store.py`, `tests/test_retriever.py`, `tests/test_parsers.py`（新增）+ `tests/test_cli.py`（更新）
+- **内容**: 每个新模块单元测试（mock 外部依赖），CLI 子命令集成测试
+- **预估**: 4 个新测试文件，≥ 60 个测试用例
 
 ---
 
-## P2 — 锦上添花
+## P1（体验完善）
 
-### T10: CI 增强 ⬜
-- **内容**：确认 CI 含 ruff lint + Docker build 测试（已就绪，验证即可）
-- **涉及文件**：`.github/workflows/ci.yml`
-- **验收**：CI 绿灯
+### T7: 开源基础设施
+- **文件**: `LICENSE`（新增 MIT）、`CHANGELOG.md`（新增）、`README.en.md`（新增英文 README）
+- **内容**: 标准 MIT LICENSE、Keep a Changelog v0.2.0 条目、完整英文 README（Installation/Quick Start/CLI Reference/Architecture）
+
+### T8: SKILL.md 更新
+- **文件**: `SKILL.md`（更新）
+- **内容**: 新增"向量存储选型"、"Embedding 微调"、"生产部署"三章；更新快速决策树引用新 CLI 命令
+
+### T9: pyproject.toml 更新
+- **文件**: `pyproject.toml`（更新）
+- **内容**: 版本号 0.1.0→0.2.0，新增 optional-dependencies（milvus/chromadb/sentence-transformers），更新 keywords/classifiers
 
 ---
 
-## 依赖关系
+## P2（锦上添花）
 
-```
-T4 (版本号) ──┐
-T5 (ignore测试) ──┤
-T6 (watch测试) ──┼── T9 (README) ── 完成
-T7 (stats chart) ─┤
-T8 (stats top-N) ─┘
-```
+### T10: docs/ 更新
+- **文件**: `docs/STRUCTURE.md`, `docs/FILES.md`, `docs/CODE.md`（更新）
+- **内容**: 反映 v0.2.0 新增模块
 
-T4-T8 可并行开发。T9 在最后统一更新 README。
-
-## 总预估工时
-约 3.5 小时（基础设施已完成，主要工作在测试+stats增强+README）
+### T11: 集成测试
+- **文件**: `tests/test_integration.py`（新增）
+- **内容**: 端到端测试：parse → chunk → embed（mock）→ store（mock）→ query → results

@@ -217,3 +217,45 @@
 - 交接: `artifacts/handover-to-dev.md`
 
 **结果：** 🔄 本轮进行中（Round 7）。
+
+### Sprint 8 (2026-06-03) — rag-builder v0.1.0「从零到一」
+
+**决策：** 从 fclean 转向 rag-builder（RAG 技能），一步到位。方向由竞赛统一指定。
+
+**理由：** fclean 已迭代 7 轮，累计 366 vs 297 领先 69 分。RAG 技能是全新赛道，蓝队有实战经验（LightRAG、embedding 微调、RAGAS 评测）。
+
+**产出：**
+- SKILL.md: 774 行，覆盖 RAG 全链路（12 章 + 13 陷阱）
+- Python 包: 4 模块（cli/config_schema/scaffold/benchmark），1166 行
+- 测试: 78 个全绿
+- README.md: 256 行，含竞品对比表
+- Release v0.1.0
+
+**结果：** ✅ Round 8 蓝队 62:0 大胜（红队完全缺席）。累计 366:297。
+
+### Sprint 9 (2026-06-03) — rag-builder v0.2.0「真正可用」
+
+**决策：** 在 rag-builder v0.1.0 基础上迭代，补齐核心 RAG 逻辑 + 开源基础设施。
+
+**理由（结构化决策）：**
+
+| 因素 | 分析 |
+|------|------|
+| 裁判反馈对应 | ① Python 包深度有限 → 新增 4 个核心模块（P0）② 无 LICENSE → 补齐（P0）③ 无英文 README → 创建（P0）④ 无 CHANGELOG → 创建（P0） |
+| 差异化点 | 轻量 RAG 工具包（vs LangChain/LlamaIndex 重型框架）+ 774 行实战 SKILL.md |
+| 红队状态 | project/ 为空，从零开始。蓝队迭代优势巨大 |
+| 累计态势 | 蓝队 366 vs 红队 297（+69），保持节奏即可 |
+| 迭代 vs 重开 | rag-builder 刚起步，v0.1.0→v0.2.0 是自然迭代 |
+
+**差异化策略：**
+1. **核心能力升级** — embeddings/vector_store/retriever/parsers 四个模块，从"辅助"变"可用"
+2. **CLI 驱动** — `rag-builder ingest` + `rag-builder query` 实际可运行
+3. **开源规范补齐** — LICENSE + CHANGELOG + 英文 README（解决 6 轮历史债务）
+4. **可选依赖** — `pip install rag-builder[milvus]`，核心包轻量
+
+**产出文件：**
+- PRD: `artifacts/prd/2026-06-03-rag-builder-r9-prd.md`
+- 任务: `artifacts/tasks.md`（11 项，P0×6 + P1×3 + P2×2）
+- 交接: `artifacts/handover-to-dev.md`
+
+**结果：** 🔄 本轮进行中（Round 9）。

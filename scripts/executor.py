@@ -522,6 +522,7 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
     # 轮次上下文（每轮不同的项目方向）
     ROUND_CONTEXT = {
         "2026-round-8": "本轮方向：开发一个 RAG（检索增强生成）相关的 Hermes Agent 技能。技能应帮助用户构建或优化 RAG 系统，例如：PDF 解析、向量检索、混合检索、Reranker 精排、查询分解等。产出是一个完整的 SKILL.md 文件，可直接安装到 Hermes Agent 使用。",
+        "2026-round-9": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始，蓝队在已有 rag-builder 基础上优化。红队项目路径 teams/red/project/ 是空目录，需要从零搭建。蓝队项目路径 teams/blue/project/ 已有 rag-builder 代码，在此基础上迭代优化。两队都产出完整的 SKILL.md + Python 工具包。",
     }
     round_context = ROUND_CONTEXT.get(round_id, "")
 

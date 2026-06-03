@@ -1,74 +1,53 @@
-# Handover: Product → Dev (Round 6 — 重试更新)
+# Handover: Product → Dev（Round 9）
 
-> 日期：2026-05-31
-> PRD：artifacts/prd/2026-05-30-fclean-r6-prd.md
-> 任务清单：artifacts/tasks.md
+> 日期: 2026-06-03
+> 项目: rag-builder v0.2.0
+> 团队: Blue
 
 ---
 
 ## 本轮目标
 
-fclean v0.5.0 — 生产化补齐 + 差异化功能。闭合与红队的功能差距（Docker/Pre-commit），同时保持 AI Agent 领先优势（PyPI 先发 + .fcleanignore + watch）。
+将 rag-builder 从"配置验证 + 模板生成"升级为**可实际运行的 RAG 工具包**。
 
-## ⚠️ 竞品最新动态（Round 6 重试时更新）
+## 做什么
 
-红队 dirsort 已推进到 **v0.6.0 "Extensible Platform"**，新增：
-- 🔌 **插件系统**（plugin_base.py + plugin_system.py）— Python 插件扩展分类逻辑和报告格式
-- 📊 **ASCII 图表**（stats_enhanced.py）— 饼图/柱状图可视化文件类型分布
-- 📁 **大文件 Top-N** — `dirsort stats --top 10`
-- 📋 **JSON 元数据增强** — `--json` 输出含版本/插件/引擎信息
+4 个新核心模块 + CLI 扩展 + 开源基础设施补齐：
 
-红队 v0.6.0 的文件结构：
-```
-src/dirsort/ (15 files): cli, config, dupes, plugin_base, plugin_system,
-                         rename, rules, sorter, stats_enhanced, tui_app,
-                         tui_screens, undo, utils + __init__/__main__
-```
+1. **embeddings.py** — Embedding 抽象层（sentence-transformers 本地 + OpenAI 兼容 API 远程）
+2. **vector_store.py** — 向量存储连接器（Milvus + Chroma，统一接口）
+3. **parsers.py** — 文档解析器（PDF/Markdown）+ 分块器
+4. **retriever.py** — 混合检索器（BM25 + 向量 RRF 融合）
+5. **cli.py 扩展** — `ingest` 和 `query` 子命令
+6. **开源基础设施** — LICENSE、CHANGELOG.md、README.en.md
 
-## 竞争态势分析
+## 文件位置
 
-| 维度 | 蓝队 fclean v0.5.0 | 红队 dirsort v0.6.0 |
-|------|:---:|:---:|
-| 可扩展性 | ❌ 无插件系统 | ✅ Python 插件 |
-| 统计可视化 | ❌ 纯文本 | ✅ ASCII 图表 |
-| 文件监控 | ✅ watch（独有） | ❌ |
-| 忽略规则 | ✅ .fcleanignore（独有） | ❌ |
-| TUI | ❌ | ✅ Textual |
-| PyPI | ✅ workflow 就绪 | ✅ 已有 |
-| Docker | ✅ | ✅ |
-| Pre-commit | ✅ | ✅ |
-| AI Agent | ✅ Agent Skill + --json | ✅ --json |
+- PRD: `artifacts/prd/2026-06-03-rag-builder-r9-prd.md`
+- 任务: `artifacts/tasks.md`
+- 项目代码: `project/src/rag_builder/`
 
-## 已完成基础设施（Dev 已实现）
+## 设计约束
 
-| 模块 | 文件 | 状态 |
-|------|------|------|
-| .fcleanignore | `src/fclean/ignore.py` (143行) | ✅ 源码完成 |
-| fclean watch | `src/fclean/watcher.py` (124行) | ✅ 源码完成 |
-| Dockerfile | `Dockerfile` | ✅ 已就绪 |
-| Pre-commit | `.pre-commit-hooks.yaml` | ✅ 已就绪 |
-| CI (含Docker测试) | `.github/workflows/ci.yml` | ✅ 已就绪 |
-| PyPI publish | `.github/workflows/publish.yml` | ✅ 已就绪 |
-
-## 剩余工作优先级
-
-### P0 — 必须完成
-1. **T5/T6 补测试** — test_ignore.py + test_watcher.py（源码已完成，测试缺失）
-2. **T4 版本号 + CHANGELOG** — 确认 v0.5.0 + CHANGELOG.md 更新
-3. **T7 README 更新** — 确认 README 包含 watch/ignore/Docker/Pre-commit 章节
-
-### P1 — 重要（回应红队 v0.6.0）
-4. **stats 可视化增强** — `fclean stats --chart` ASCII 饼图/柱状图（对标红队 stats_enhanced.py）
-5. **stats 大文件 Top-N** — `fclean stats --top 10`（对标红队）
-
-### P2 — 如果时间充裕
-6. **T8 CI 增强** — ruff lint 步骤确认
+1. **新模块必须有抽象基类** — 方便测试 mock，方便后续扩展（如加 Qdrant/FAISS）
+2. **工厂函数模式** — `get_provider("st")` / `get_store("milvus")`，配置驱动
+3. **所有外部依赖用 optional** — `pip install rag-builder[milvus]` / `rag-builder[chromadb]`，核心包不强制安装重型依赖
+4. **现有 78 测试不能破坏** — 新功能是增量，不改现有模块接口
+5. **版本号升至 0.2.0**
 
 ## 注意事项
 
-- watchdog 应作为可选依赖（extras），不要强制安装
-- Docker 基础镜像用 python:3.12-slim，不要用 alpine
-- Pre-commit hook 只做 dry-run（不自动执行），安全第一
-- PyPI publish 用 OIDC trusted publisher，不用 API token
-- **红队已到 v0.6.0**，蓝队需要在功能深度上找到新差异点，不能只做基础设施
-- README 对比表需要更新（红队已有 --json、Docker、Pre-commit 等，不能再标 ❌）
+- pymilvus 和 chromadb 是重型依赖，测试中必须 mock，不要在 CI 中实际连接数据库
+- sentence-transformers 同理，测试中 mock embedding 返回值
+- PDF 解析用 pymupdf（轻量），不要引入 marker-pdf 或 MinerU（太重）
+- 混合检索的 RRF 公式：`score = 1/(k + rank_bm25) + 1/(k + rank_vector)`，k=60 是常用值
+- CLI 的 `ingest` 命令需要进度显示（用 print 即可，不需要 tqdm）
+
+## 验收标准
+
+- `pip install -e .` 后 `rag-builder --help` 显示所有子命令
+- `rag-builder init` 生成配置文件（已有功能，不破坏）
+- `rag-builder validate` 验证配置（已有功能，不破坏）
+- `rag-builder ingest --help` 和 `rag-builder query --help` 显示参数说明
+- 全部测试通过（旧 78 + 新 ≥ 60 = ≥ 138）
+- Ruff clean
