@@ -1,29 +1,29 @@
 {
-  "round_id": "2026-round-7",
+  "round_id": "2026-round-8",
   "team": "blue",
   "current_state": "in_progress",
   "roles": {
     "product": {
       "status": "completed",
-      "last_run": "2026-06-01T03:41:18.017450+00:00",
-      "error": null,
+      "last_run": "2026-06-03T04:24:34.359851+00:00",
+      "error": "product 仍在进行中",
       "outputs": []
     },
     "dev": {
       "status": "completed",
-      "last_run": "2026-06-01T03:54:51.994384+00:00",
+      "last_run": "2026-06-03T04:38:56.539258+00:00",
       "error": null,
       "outputs": []
     },
     "devops": {
       "status": "completed",
-      "last_run": "2026-06-01T03:57:45.223054+00:00",
+      "last_run": "2026-06-03T04:46:23.243671+00:00",
       "error": null,
       "outputs": []
     },
     "growth": {
       "status": "completed",
-      "last_run": "2026-06-01T04:04:38.176346+00:00",
+      "last_run": "2026-06-03T04:50:49.112926+00:00",
       "error": null,
       "outputs": []
     },
@@ -41,5 +41,5 @@
     "reason": null
   },
   "latest_artifacts": {},
-  "updated_at": "2026-06-01T04:04:38.176357+00:00"
+  "updated_at": "2026-06-03T04:50:49.112946+00:00"
 }

@@ -1,35 +1,35 @@
 {
-  "round_id": "2026-round-7",
+  "round_id": "2026-round-8",
   "team": "red",
   "current_state": "in_progress",
   "roles": {
     "product": {
       "status": "completed",
-      "last_run": "2026-06-01T03:40:13.068812+00:00",
+      "last_run": "2026-06-03T04:24:33.813636+00:00",
       "error": null,
       "outputs": []
     },
     "dev": {
       "status": "completed",
-      "last_run": "2026-06-01T03:48:48.520697+00:00",
+      "last_run": "2026-06-03T04:24:45.268912+00:00",
       "error": null,
       "outputs": []
     },
     "devops": {
-      "status": "completed",
-      "last_run": "2026-06-01T03:58:20.009941+00:00",
-      "error": null,
+      "status": "blocked",
+      "last_run": "2026-06-03T04:38:57.600143+00:00",
+      "error": "缺少 ready-for-deploy.md（期望路径: /mnt/d/Desktop/hermes/ai-company-wars/teams/red/artifacts/ready-for-deploy.md）",
       "outputs": []
     },
     "growth": {
-      "status": "completed",
-      "last_run": "2026-06-01T04:01:11.570566+00:00",
-      "error": null,
+      "status": "blocked",
+      "last_run": "2026-06-03T04:46:23.409309+00:00",
+      "error": "前置角色 devops 被阻塞",
       "outputs": []
     },
     "judge": {
       "status": "in_progress",
-      "last_run": "2026-06-01T04:04:38.270550+00:00",
+      "last_run": "2026-06-03T04:50:49.275711+00:00",
       "error": null,
       "outputs": []
     }
@@ -41,6 +41,6 @@
     "reason": null
   },
   "latest_artifacts": {},
-  "updated_at": "2026-06-01T04:04:38.270556+00:00",
-  "_start_ms": 1780286678270
+  "updated_at": "2026-06-03T04:50:49.275719+00:00",
+  "_start_ms": 1780462249275
 }

@@ -93,3 +93,25 @@
 - 蓝队执行力更稳定（每轮都有实质改进），红队产出波动更大
 - 比赛进入"Growth 瓶颈期"——代码和功能在进步，但 Stars 不涨
 - 下轮关键：红队 cli.py 拆分 + Growth 突破 vs 蓝队英文 README + Growth 突破
+
+### 第8轮（2026-06-03）— 🔵蓝队压倒性胜利
+
+**红队（dirsort）**: 0 分 — project/ 目录为空，完全无产出
+**蓝队（rag-builder）**: 62 分 — GitHub Stars 1.2 | 代码质量 22 | 功能完整性 27 | 项目展示 12
+
+**胜者**: 🔵 蓝队（62-0，62 分优势）
+
+**要点**:
+- 红队 Round 8 完全缺席——project/ 为空，无代码/PRD/文档/Release。ACW 开赛以来最严重缺席
+- 蓝队方向从 fclean 切换到 rag-builder（RAG 技能），一步到位
+- 蓝队 SKILL.md（774 行）覆盖 RAG 全链路，13 个实战陷阱，质量极高
+- 蓝队 Python 工具包：config_schema(276) + scaffold(454) + benchmark(222) + cli(204) = 1166 行
+- 蓝队 78 测试全绿，Ruff clean，Release v0.1.0
+- 蓝队不足：无英文 README、无 LICENSE 文件、CHANGELOG 缺失
+- 累计：蓝队 366 分 > 红队 297 分（差距暴增到 69 分）
+
+**趋势判断**:
+- 红队灾难性缺席，累计差距从 7 分暴增到 69 分
+- 蓝队方向切换成功，rag-builder 定位清晰（技能+工具 vs 框架）
+- 红队再缺席一轮基本告别竞争
+- 两队 Stars 均停滞在 3，新方向可能带来转机

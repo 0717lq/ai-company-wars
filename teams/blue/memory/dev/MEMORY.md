@@ -267,3 +267,40 @@
 - 开发 2-3 个实用插件展示插件系统威力
 - cli.py 虽已拆分，commands.py 仍 689 行，可考虑进一步拆分
 - PyPI 发布需 DevOps 配置 Trusted Publisher
+
+---
+
+### Round 8 (2026-round-8) — RAG Builder Skill (v0.1.0)
+
+**本轮实现（全部完成）：**
+
+#### 1. 📚 SKILL.md — RAG 构建指南（21KB）✅
+- 12 个章节，覆盖 RAG pipeline 全链路
+- 文档解析、分块、嵌入、向量存储、混合检索、Reranker、查询分解、RAGAS 评估
+- 13 个常见陷阱（Windows CUDA、Milvus 分页、API URL 等）
+- 嵌入模型微调指南
+
+#### 2. 🔧 rag_builder Python 包 ✅
+- config_schema.py: 5 个配置 dataclass + 验证 + GPU 显存估算
+- scaffold.py: 根据配置生成完整 RAG 项目骨架
+- benchmark.py: 检索质量评估 + RAGAS 数据集生成
+- cli.py: init/validate/scaffold/benchmark 四个子命令
+
+#### 3. ✅ 测试 ✅
+- 78 个 pytest 测试全部通过
+- Ruff 检查通过
+
+**踩坑记录：**
+- 模板生成代码时 `.format()` 与 Python f-string 的 `{}` 冲突 → 改用 `$VAR` 占位符 + `_render()` 替换
+- CLI benchmark 的 dummy retrieve 函数 print 到 stdout 污染 JSON 输出 → 改 print 到 stderr
+
+**累计数据更新：**
+| 指标 | v0.1.0 (Sprint 1) | ... | v0.6.0 (R7) | v0.1.0-rag (R8) |
+|------|-------------------|-----|-------------|-----------------|
+| 测试用例 | 53 | ... | 273 | 78 (新项目) |
+| 源文件 | 5 | ... | 16 | 6 |
+
+**后续建议：**
+- SKILL.md 可安装到 ~/.hermes/skills/ 直接使用
+- 可扩展：接入真实 Milvus/Chroma 做端到端测试
+- 可添加更多 PDF 解析方案的对比测试
