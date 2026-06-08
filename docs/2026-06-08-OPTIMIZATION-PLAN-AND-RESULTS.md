@@ -36,6 +36,16 @@
 ### 重要发现 🎯
 远程 master 当时停在 **Round-9**（`4337cd3`），而含 token 的提交是 Round-10/11 才产生的，**从未被 push 到 GitHub**。结论：**公开仓库实际从未真正暴露过 token**。配合 token 已吊销，风险归零。
 
+### P0-2　token 经 URL 传递的泄露（第二轮深挖修复）
+
+**方案**：不再把 token 拼进 remote URL，改用 `GIT_ASKPASS` 传凭据；日志写盘前统一脱敏。
+
+**结果 ✅**
+- 新增 `git_push_token()`：凭据经一个**读环境变量的临时 askpass 脚本**喂给 git，token 仅存在于临时环境变量，**绝不进入 URL / `.git/config` / 命令行参数 / stderr**
+- `auto_push`、`_sync_main_repo` 全部改用，删除 `set-url 嵌 token → push → 还原` 的脆弱写法
+- `log()` 增加 `redact()` 自动脱敏（`github_pat_`/`ghp_`/`https://<token>@` 形式），纵深防御
+- 清理 `logs/2026-06-03.log` 中现存的失效 `ghp_` token 串
+
 ---
 
 ## 三、P1 正确性 — 方案与结果
@@ -61,8 +71,11 @@
 | P2-1 | `ROUND_CONTEXT` 字典外置为 `runtime/round-config.json`，executor 通过 `_load_round_context` 读取 | ✅ 新增轮次只改 JSON，不动代码 |
 | P2-2 | 抽取 `scripts/github_auth.py` 统一 token 获取（环境变量 → `~/.hermes/.env` → Windows）与校验；executor、api-sync 全部复用 | ✅ 消除 4 处重复逻辑 |
 | P2-4 | 新增 `scripts/tests/`：状态机 19 项（`aggregate_team_state`/`check_preconditions`/`check_round_state` 等）+ 安全函数 9 项（产物校验、secret 扫描） | ✅ **37 个测试全绿** |
+| P2-3 | `ROLE_EXEC_TIMEOUT`/`GIT_PUSH_TIMEOUT`/`ADVANCE_MAX_ITERATIONS` 常量集中；advance 主循环改 `for-else`，撞顶时告警 | ✅ 魔法值归位 + 失控可见 |
+| P2-5 | `run_judge` 写死的 `"red"` 改为 `JUDGE_TEAM` 常量 | ✅ 全局角色不再绑定具体队伍 |
+| P2-6 | 团队列表抽成 `TEAMS` 常量，替换 5 处 `("red","blue")` 硬编码 | ✅ 扩队/改名只改一处 |
 
-> P2-3（常量集中）、P2-5（Judge 触发）评估后判定为低收益、改动牵连较大，本轮未动，留待后续。
+> 注：P2-3、P2-5 在第一轮判定为低收益暂缓，第二轮深挖（连同 P0-2、P2-6）一并完成。
 
 ---
 
@@ -84,11 +97,12 @@
 | `scripts/tests/test_run_round.py` | 新增 | 状态机单元测试（19） |
 | `scripts/tests/test_executor.py` | 新增 | 产物校验 + secret 扫描测试（9） |
 | `runtime/round-config.json` | 新增 | 每轮项目方向外置配置 |
-| `scripts/executor.py` | 修改 | secret 门禁、产物校验、分支名、熔断器语义、配置/token 复用 |
+| `scripts/executor.py` | 修改 | secret 门禁、产物校验、分支名、熔断器语义、配置/token 复用；`git_push_token`（askpass）、`redact` 日志脱敏、常量集中、`TEAMS`/`JUDGE_TEAM` |
 | `scripts/run-round.py` | 修改 | `_start_ms` 移除、Judge 状态同步 |
 | `.gitignore` | 修改 | token/tmp 忽略规则 |
 | `README.md` | 修改 | 战绩/轮次/结构同步 |
 | `skills/dev-agent-draft.md` | 修改 | 废弃标注 |
+| `logs/2026-06-03.log` | 修改 | 清理失效 token 串 |
 
 ---
 
@@ -105,22 +119,32 @@
 ## 八、总结
 
 ### 做了什么
-从一次 token 泄露的止血开始，连带修复了 5 个正确性 Bug、完成 3 项可维护性重构、同步了过时文档，并沉淀出一个离线同步工具。**13 个诊断问题中处理 11 个**（P2-3、P2-5 评估后暂缓），核心脚本从"零测试"到"37 个测试护栏"。
+从一次 token 泄露的止血开始，连带修复了 5 个正确性 Bug、完成全部可维护性重构、同步了过时文档，并沉淀出一个离线同步工具。诊断出的 **15 个问题全部处理完毕**（含第二轮深挖的 P0-2、P2-6），核心脚本从"零测试"到"37 个测试护栏"。
 
 ### 最有价值的三点
 1. **把"成功"变得名副其实**（P1-2）：退出码不再等于成功，必须有真实产物 —— 这是多 Agent 自动系统最容易被掩盖的失效。
-2. **根治泄露而非仅止血**（P0 + secret 门禁）：去掉 `git add -A` + 提交/push 前扫描，让"零人工干预"管道也拦得住 secret。
-3. **token 真源唯一化**（P2-2 + `.bashrc` 动态化）：从 4 处藏匿副本收敛到统一模块 + 单一真源，轮换只需改一处。
+2. **token 防护建成四层纵深**（P0 + P0-2 + secret 门禁 + 日志脱敏）：见下表，任意一层失守仍有后续拦截。
+3. **token 真源唯一化**（P2-2 + `.bashrc` 动态化 + `github_auth` 模块）：从 4 处藏匿副本收敛到统一模块 + 单一真源，轮换只需改一处。
+
+#### token 防护四层纵深
+| 层 | 措施 | 防的是 |
+|:---:|------|--------|
+| 1 不落仓库 | `.gitignore` 规则 + 显式 `git add`（无 `-A`） | token 文件进版本库 |
+| 2 不入传输 | `GIT_ASKPASS` 传凭据，token 不进 URL/config/参数 | token 残留在 config / 进程参数 |
+| 3 提交前扫描 | commit/push 前扫 `github_pat_`/`ghp_`，命中即中止 | 漏网的 token 被推到远程 |
+| 4 日志脱敏 | 写盘前 `redact()` 抹除 token/带凭据 URL | token 泄进本地日志 |
 
 ### 经验教训
-- **自动化放大疏忽**：无人值守管道里，一个没忽略的文件不会被骂一次就改，而是每轮稳定泄露一次。自动化必须自带防线（secret 门禁、显式 add）。
+- **自动化放大疏忽**：无人值守管道里，一个没忽略的文件不会被骂一次就改，而是每轮稳定泄露一次。自动化必须自带防线（secret 门禁、显式 add、askpass）。
 - **"完成"需要被定义**：Agent 系统里"跑完了"和"做对了"是两回事，必须用可验证的产物来界定。
+- **凭据永远不进 URL**：token 拼进 URL 看似省事，却会顺着 stderr→日志、set-url→config 四处渗漏；askpass/凭据助手才是正道。
 
 ### 环境遗留（非代码问题）
 1. **github.com 被 DNS 污染**（解析到死 IP，真实 IP 间歇可达）：常规 `git push` 走不通。恢复方式 —— 稳定 VPN（全局模式）或真实终端中 `/etc/hosts` 加 `140.82.112.3 github.com`。在此之前用 `python3 scripts/api-sync.py` 经 api.github.com 同步。
 2. **本地 git 历史与远程分叉**：API 同步是快照式提交，与本地多提交历史不一致（内容一致）。未来恢复原生 push 时，需 `git fetch` 后 reconcile 一次。
 
-### 后续建议（未做）
-- P2-3：常量集中到配置区
-- P2-5：Judge 触发从 red 队解耦为独立全局调用
+### 后续建议（未做，低优先）
+- 状态文件接入 `*.schema.json` 校验，坏数据早发现
 - 给 `executor.py` 的并行调度、push 流程补集成测试
+- 接 CI 自动跑 pytest（受当前网络限制，价值打折）
+- `hermes` 调用加重试/退避，缓冲瞬时抖动
