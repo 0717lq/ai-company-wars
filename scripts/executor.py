@@ -42,8 +42,14 @@ ROUND_CONFIG = os.path.join(BASE_DIR, "runtime", "round-config.json")
 RUNNER = os.path.join(BASE_DIR, "scripts", "run-round.py")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
+# 参赛队伍（集中定义，便于将来扩展/改名）
+TEAMS = ("red", "blue")
+
 # 角色执行顺序（per-team）
 ROLE_CHAIN = ["product", "dev", "devops", "growth"]
+
+# Judge 是全局角色，不属于任何队伍；触发时借用此队伍的执行通道
+JUDGE_TEAM = TEAMS[0]
 
 # 角色 → Hermes skill 名
 ROLE_SKILL = {
@@ -95,14 +101,42 @@ GITHUB_API = "https://api.github.com"
 # 默认卡住阈值（分钟）
 DEFAULT_STUCK_THRESHOLD = 30
 
+# ── 运行参数（集中配置，避免魔法值散落） ──────────────────
+ROLE_EXEC_TIMEOUT = 1800   # 单个角色 hermes 执行超时（秒）
+GIT_PUSH_TIMEOUT = 120     # git push 超时（秒）
+ADVANCE_MAX_ITERATIONS = 20  # advance 主循环单次最多推进的阶段数（防失控）
+
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 
 # ── 日志 ──────────────────────────────────────────────────
 
+import re as _re
+
+# token 脱敏模式（纵深防御：任何写入日志/打印的内容都先过一遍）
+_TOKEN_REDACT = [
+    _re.compile(r"github_pat_[A-Za-z0-9_]{10,}"),
+    _re.compile(r"ghp_[A-Za-z0-9]{10,}"),
+    _re.compile(r"gho_[A-Za-z0-9]{10,}"),
+    # https://<token>@github.com 形式
+    _re.compile(r"(https://)[^@/\s]+(@)"),
+]
+
+
+def redact(text: str) -> str:
+    """抹掉文本中的疑似 token，用于日志/异常输出。"""
+    if not text:
+        return text
+    out = text
+    for pat in _TOKEN_REDACT[:3]:
+        out = pat.sub(lambda m: m.group(0)[:8] + "***", out)
+    out = _TOKEN_REDACT[3].sub(r"\1***\2", out)
+    return out
+
+
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{ts}] {msg}"
+    line = f"[{ts}] {redact(str(msg))}"
     print(line)
     log_file = os.path.join(LOGS_DIR, f"{datetime.now().strftime('%Y-%m-%d')}.log")
     with open(log_file, "a", encoding="utf-8") as f:
@@ -360,7 +394,6 @@ def auto_push(team: str, round_id: str, dry_run: bool = False) -> dict:
         result["reason"] = f"token 检查失败: {token_info}"
         log(f"[{team}/push] ⏭ {result['reason']}")
         return result
-    token = token_info
 
     # Step 2: remote 检查
     remote_ok, remote_info = check_git_remote(project_dir)
@@ -413,65 +446,72 @@ def auto_push(team: str, round_id: str, dry_run: bool = False) -> dict:
         log(f"[{team}/push] 🛑 {result['reason']}")
         return result
 
-    # Step 4: push（token 嵌入 URL，git 原生不读环境变量）
-    original_url = ""
-    try:
-        # 获取当前 remote URL
-        url_proc = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=10,
-            cwd=project_dir,
-        )
-        original_url = url_proc.stdout.strip()
-        # 嵌入 token: https://github.com/... → https://<token>@github.com/...
-        if original_url.startswith("https://"):
-            auth_url = original_url.replace("https://", f"https://{token}@")
-        else:
-            auth_url = original_url
-
-        # 临时设置带 token 的 URL
-        subprocess.run(
-            ["git", "remote", "set-url", "origin", auth_url],
-            capture_output=True, text=True, timeout=10,
-            cwd=project_dir,
-        )
-
-        proc = subprocess.run(
-            ["git", "push", "origin", "main"],
-            capture_output=True, text=True, timeout=120,
-            cwd=project_dir,
-        )
-
-        # 恢复原始 URL（不留 token 在 config 里）
-        subprocess.run(
-            ["git", "remote", "set-url", "origin", original_url],
-            capture_output=True, text=True, timeout=10,
-            cwd=project_dir,
-        )
-
-        if proc.returncode == 0:
-            result["success"] = True
-            result["reason"] = "push 成功"
-            log(f"[{team}/push] ✅ push 成功")
-        else:
-            result["skipped"] = True
-            result["reason"] = f"push 失败: {proc.stderr[-200:]}"
-            log(f"[{team}/push] ⏭ {result['reason']}")
-    except Exception as e:
-        # 异常时也恢复 URL
-        try:
-            subprocess.run(
-                ["git", "remote", "set-url", "origin", original_url],
-                capture_output=True, text=True, timeout=10,
-                cwd=project_dir,
-            )
-        except Exception:
-            pass
+    # Step 4: push（token 经 GIT_ASKPASS 传入，不进 URL/config/参数/日志）
+    ok, msg = git_push_token(project_dir, "main")
+    if ok:
+        result["success"] = True
+        result["reason"] = msg
+        log(f"[{team}/push] ✅ {msg}")
+    else:
         result["skipped"] = True
-        result["reason"] = f"push 异常: {e}"
-        log(f"[{team}/push] ⏭ {result['reason']}")
+        result["reason"] = msg
+        log(f"[{team}/push] ⏭ {msg}")
 
     return result
+
+
+# ── Git push（凭据经 GIT_ASKPASS，token 不入 URL/config/参数） ──
+
+import tempfile
+
+
+def _clean_https_url(url: str) -> str:
+    """去掉 URL 中可能内嵌的 token，返回干净 https URL。"""
+    return _re.sub(r"(https://)[^@/]+@", r"\1", url.strip())
+
+
+def git_push_token(repo_dir: str, branch: str, timeout: int = GIT_PUSH_TIMEOUT) -> tuple[bool, str]:
+    """用 GIT_ASKPASS 传 token 推送当前 origin 到指定分支。
+    token 仅存在于临时环境变量，绝不进入 URL / .git/config / 命令行参数 / 日志。
+    返回 (success, message)。"""
+    token = _get_token()
+    if not token:
+        return False, "无 GitHub token"
+
+    # 取 origin 干净 URL，用户名 x-access-token 放 URL（非机密），密码由 askpass 提供
+    try:
+        url = subprocess.run(["git", "remote", "get-url", "origin"],
+                             capture_output=True, text=True, timeout=10,
+                             cwd=repo_dir).stdout
+    except Exception as e:
+        return False, f"读取 remote 失败: {e}"
+    clean = _clean_https_url(url)
+    push_url = clean.replace("https://", "https://x-access-token@") if clean.startswith("https://") else clean
+
+    # 临时 askpass 脚本：从环境变量读 token，token 不落在脚本文件里
+    fd, askpath = tempfile.mkstemp(prefix="acw-askpass-", suffix=".sh")
+    try:
+        os.write(fd, b'#!/bin/sh\nexec printf "%s" "$ACW_GIT_TOKEN"\n')
+        os.close(fd)
+        os.chmod(askpath, 0o700)
+        env = dict(os.environ, GIT_ASKPASS=askpath, ACW_GIT_TOKEN=token,
+                   GIT_TERMINAL_PROMPT="0")
+        proc = subprocess.run(["git", "push", push_url, branch],
+                              capture_output=True, text=True, timeout=timeout,
+                              cwd=repo_dir, env=env)
+    except subprocess.TimeoutExpired:
+        return False, "push 超时"
+    except Exception as e:
+        return False, f"push 异常: {redact(str(e))}"
+    finally:
+        try:
+            os.unlink(askpath)
+        except OSError:
+            pass
+
+    if proc.returncode == 0:
+        return True, "push 成功"
+    return False, f"push 失败: {redact(proc.stderr[-200:])}"
 
 
 # ── 角色产物校验 ──────────────────────────────────────────
@@ -630,7 +670,7 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
     try:
         exec_proc = subprocess.run(
             ["hermes", "chat", "-s", skill, "-q", prompt],
-            capture_output=True, text=True, timeout=1800,
+            capture_output=True, text=True, timeout=ROLE_EXEC_TIMEOUT,
             cwd=BASE_DIR,
         )
         duration = time.time() - start
@@ -650,7 +690,7 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
         result["duration_s"] = round(duration, 1)
         result["error"] = f"执行超时 ({duration:.0f}s)"
         log(f"[{team}/{role}] ❌ 执行超时")
-        _complete_role(team, role, round_id, "failed", "执行超时 1800s")
+        _complete_role(team, role, round_id, "failed", f"执行超时 {ROLE_EXEC_TIMEOUT}s")
         if role == "dev":
             update_circuit_breaker(team, False)
         return result
@@ -707,7 +747,7 @@ def run_phase_parallel(role: str, round_id: str, dry_run: bool = False,
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(run_role, team, role, round_id, dry_run, preview): team
-            for team in ("red", "blue")
+            for team in TEAMS
         }
         for future in as_completed(futures):
             team = futures[future]
@@ -726,9 +766,9 @@ def run_phase_parallel(role: str, round_id: str, dry_run: bool = False,
 # ── Judge 执行 ────────────────────────────────────────────
 
 def run_judge(round_id: str, dry_run: bool = False) -> dict:
-    """执行全局 Judge"""
+    """执行全局 Judge（不绑定具体队伍，借用 JUDGE_TEAM 通道执行）"""
     log("═══ 阶段: Judge (全局) ═══")
-    r = run_role("red", "judge", round_id, dry_run)
+    r = run_role(JUDGE_TEAM, "judge", round_id, dry_run)
     log(f"═══ Judge 完成: {'✅' if r['success'] else '❌'} ═══")
     return r
 
@@ -750,7 +790,7 @@ def init_round(round_id: str):
     }
     write_json(ROUND_JSON, round_data)
 
-    for team in ("red", "blue"):
+    for team in TEAMS:
         status = {
             "round_id": round_id,
             "team": team,
@@ -790,7 +830,7 @@ def advance(dry_run: bool = False, stuck_threshold: int = DEFAULT_STUCK_THRESHOL
     log(f"=== ACW Executor 启动 | 轮次: {round_id}{' [preview]' if preview else ''} ===")
 
     # 检查卡住
-    for team in ("red", "blue"):
+    for team in TEAMS:
         for role in ROLE_CHAIN + ["judge"]:
             stuck, reason = check_stuck(team, role, stuck_threshold)
             if stuck:
@@ -799,9 +839,8 @@ def advance(dry_run: bool = False, stuck_threshold: int = DEFAULT_STUCK_THRESHOL
                     _retry_role(team, role, round_id)
 
     # 主循环
-    max_iterations = 20
     dry_run_roles_done = set()
-    for _ in range(max_iterations):
+    for _ in range(ADVANCE_MAX_ITERATIONS):
         round_data = get_round_data()
         if round_data is None:
             break
@@ -835,7 +874,7 @@ def advance(dry_run: bool = False, stuck_threshold: int = DEFAULT_STUCK_THRESHOL
                 break
         else:
             all_done = True
-            for team in ("red", "blue"):
+            for team in TEAMS:
                 s = get_role_status(team, target_role)
                 if dry_run and target_role in dry_run_roles_done:
                     continue
@@ -860,6 +899,11 @@ def advance(dry_run: bool = False, stuck_threshold: int = DEFAULT_STUCK_THRESHOL
         if dry_run:
             dry_run_roles_done.add(target_role)
             _force_advance_round(round_data)
+    else:
+        # for 循环跑满 ADVANCE_MAX_ITERATIONS 仍未 break → 撞顶，可能卡死或推进异常
+        if not dry_run:
+            log(f"⚠️ advance 主循环达到上限 {ADVANCE_MAX_ITERATIONS} 次仍未收敛，"
+                f"可能存在卡住/推进异常，请人工检查 round 状态")
 
     summary = {
         "round_id": round_id,
@@ -916,40 +960,19 @@ def _sync_main_repo(round_id: str):
         msg = f"Round {round_id} 自动同步"
         subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
 
-        # git push（用 token）
-        token = _get_token()
-        if not token:
-            log("📦 ⚠️ 无 GitHub token，跳过 push")
-            return
-
-        # 获取当前 remote URL
-        url_proc = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
-        original_url = url_proc.stdout.strip()
-        if not original_url:
-            log("📦 ⚠️ 无 origin remote，跳过 push")
-            return
-
-        # 嵌入 token push
-        if original_url.startswith("https://"):
-            auth_url = original_url.replace("https://", f"https://{token}@")
-        else:
-            auth_url = original_url
-
-        # 动态获取当前分支名（不再硬编码 master/main）
+        # 动态获取当前分支名（不硬编码 master/main）
         branch_proc = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
                                      capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
         branch = branch_proc.stdout.strip() or "main"
 
-        subprocess.run(["git", "remote", "set-url", "origin", auth_url], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
-        push_proc = subprocess.run(["git", "push", "origin", branch], capture_output=True, text=True, timeout=120, cwd=BASE_DIR)
-        subprocess.run(["git", "remote", "set-url", "origin", original_url], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
-
-        if push_proc.returncode == 0:
+        # push（token 经 GIT_ASKPASS，不进 URL/config/参数/日志）
+        ok, msg = git_push_token(BASE_DIR, branch)
+        if ok:
             log("📦 ✅ 主仓库已同步到 GitHub")
         else:
-            log(f"📦 ⚠️ push 失败: {push_proc.stderr[-200:]}")
+            log(f"📦 ⚠️ {msg}")
     except Exception as e:
-        log(f"📦 ⚠️ 同步异常: {e}")
+        log(f"📦 ⚠️ 同步异常: {redact(str(e))}")
 
 
 def _get_token() -> str:
@@ -1026,7 +1049,7 @@ def show_status():
         print(f"  下次自动推进: {next_at[:16]}")
     print(f"{'='*60}\n")
 
-    for team in ("red", "blue"):
+    for team in TEAMS:
         ts = get_team_status(team)
         if ts is None:
             print(f"  {team}: 无状态文件")
