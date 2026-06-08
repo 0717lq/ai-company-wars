@@ -304,3 +304,51 @@
 - SKILL.md 可安装到 ~/.hermes/skills/ 直接使用
 - 可扩展：接入真实 Milvus/Chroma 做端到端测试
 - 可添加更多 PDF 解析方案的对比测试
+
+### Round 10 (2026-round-10) — rag-builder v0.3.0: Diagnose + SKILL.md Split
+
+**本轮实现（全部完成）：**
+
+#### 1. 🔧 修复 batch_processing bug（T1）✅
+- `test_batch_processing` 测试修复：`__init__` 维度探测调用与 `embed_texts` batch 调用分离计数
+- 测试现在正确 reset mock 后单独验证 embed_texts 的 2 次 batch API 调用
+- 根因：`OpenAIProvider.__init__` 调用 `embeddings.create()` 探测维度，mock 计数包含了这次
+
+#### 2. 📄 SKILL.md 拆分（T2）✅
+- 从 774 行精简至 221 行主文件（≤300 行达标）
+- 6 个 references/ 专题文件：pdf-parsing, embedding-models, chunking-strategies, vector-stores, retrieval-methods, pitfalls
+- 主文件保留快速开始 + CLI 参考 + 配置说明 + 深入阅读链接
+
+#### 3. 🔍 rag-builder diagnose 命令（T3+T4）✅
+- `diagnose.py` 模块：4 维度检查（配置+依赖+GPU+网络）
+- 配置验证：复用 config_schema.py
+- 依赖检测：7 个包（sentence-transformers/openai/pymilvus/chromadb/pymupdf/rank-bm25/jieba）
+- GPU 检测：nvidia-smi（型号+总显存+空闲显存）
+- 显存估算：配置需求 vs 实际可用
+- 网络检测：TCP（Milvus）+ HTTP（OpenAI API）
+- `--json` 输出 + `--skip-network` 标志
+- 25 个测试覆盖所有检查维度
+
+#### 4. 📦 版本更新（T5）✅
+- v0.2.0 → v0.3.0（pyproject.toml + __init__.py + CHANGELOG.md）
+- CLI 子命令数：6 → 7（新增 diagnose）
+
+**测试状态：** 172 个测试全部通过（+25 新增，+6 从 batch bug 修复）
+
+**累计数据更新：**
+| 指标 | v0.1.0 (R8) | v0.2.0 (R9) | v0.3.0 (R10) |
+|------|-------------|-------------|--------------|
+| 测试用例 | 78 | 141+6=147 | 172 (+25) |
+| 源文件 | 6 | 10 | 11 |
+| CLI 命令 | 4 | 6 | 7 (diagnose) |
+| SKILL.md 行数 | 774 | 774 | 221 |
+
+**踩坑记录：**
+- batch bug 根因是 `__init__` 中的维度探测 API 调用被 mock 计数器捕获，不是 `embed_texts` 的逻辑错误
+- `socket` 模块在函数内 import 时，`@patch("rag_builder.diagnose.socket.socket")` 会失败，需用 `@patch("socket.socket")`
+- Ruff N803 规则与 Milvus 类名冲突（Collection/DataType 等作为参数名），属旧代码问题
+
+**后续建议：**
+- 可添加 diagnose 的 SKILL.md 拆分完整性检查（P2）
+- README 中英文版本需同步更新 diagnose 命令说明
+- 可考虑接入真实 Milvus/Chroma 做端到端集成测试

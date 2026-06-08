@@ -1,41 +1,38 @@
-# dirsort v0.7.0 — Plugin Ecosystem
+# rag-decompose v0.2.0 — Quality & Coverage Release
 
-> Release: 2026-06-01 | Team: Red | Round: 7
+> 2026-06-03 | Round 11
 
-## Highlights
+## Summary
 
-### 3 Practical Plugins (裁判要求"让插件系统产生实际价值")
+rag-decompose 从 MVP (v0.1.0) 迭代到生产就绪 (v0.2.0)，核心改进是测试覆盖率和代码质量。
 
-| Plugin | Description | Hook |
-|--------|-------------|------|
-| `date-classifier` | 按修改日期分类（今天/本周/本月/更早） | classify |
-| `project-classifier` | 按语言/项目类型分类（20+ 语言识别） | classify |
-| `duplicate-reporter` | 存储健康报告（大文件检测 + 扩展名空间 Top-5） | report |
+## Changes
 
-### Engineering Improvements
+### Ruff Lint Cleanup (19 → 0 violations)
+- Removed 7 unused imports (F401)
+- Fixed 3 type annotations (UP045: Optional → X | None)
+- Fixed 7 empty f-strings (F541)
+- Fixed 1 zip missing strict parameter (B905)
+- Fixed 1 assert False (B011)
+- Fixed import sorting (I001)
 
-- **CHANGELOG.md**: 规范版本记录，覆盖 v0.1.0 ~ v0.7.0
-- **PyPI publish workflow**: `.github/workflows/publish.yml` — OIDC Trusted Publisher
-- **Version bump**: 0.6.0 → 0.7.0（`__init__.py` + `pyproject.toml` 一致）
+### Test Coverage (58% → 98%)
+- **cli.py**: 0% → 100% (38 tests, direct function calls)
+- **strategies.py**: 72% → 98% (37 tests, with LLM mocks)
+- **models.py**: 96% → 100% (8 tests)
+- **Total**: 34 → 91 tests
 
-### Quality
+### Version Bump
+- pyproject.toml: 0.2.0
+- __init__.py: 0.2.0
+- CHANGELOG.md: v0.2.0 entry added
 
-- 229 tests all passing (22 new plugin tests)
-- Ruff lint: all checks passed
-- Code changes: 13 files, +885 / -167
+## Test Results
+- 91 tests passed (1.12s)
+- Ruff: All checks passed
+- Coverage: 98% (292 statements, 5 misses)
 
-## Stats
-
-| Metric | Value |
-|--------|-------|
-| Total tests | 229 |
-| New tests | 22 |
-| Files changed | 13 |
-| Lines added | 885 |
-| Lines removed | 167 |
-
-## Known Limitations
-
-- README.md / README.en.md v0.7.0 章节待 Growth Agent 更新
-- 插件优先级/排序机制未实现（当前按字母序加载）
-- `.github/workflows/*` 受 PAT workflow scope 限制，CI 文件需后续手动推送
+## Notes
+- No functional changes — pure quality release
+- All existing features preserved
+- LLM strategy tests use mocked API calls

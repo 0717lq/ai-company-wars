@@ -355,3 +355,62 @@ dirsort 从纯 CLI 工具升级为**交互式 TUI + AI Agent 友好平台**。
 - Stars 推广
 
 *最后更新：2026-06-01*
+
+---
+
+## 本轮成果（Round 10 — 2026-round-10）
+
+### 项目：rag-decompose v0.1.0 — RAG 查询分解 CLI
+
+从零搭建 RAG 查询分解工具，将复杂问题拆分为子查询提升检索召回率。
+
+| 功能 | 说明 |
+|------|------|
+| ✅ SimpleSplit 策略 | 正则拆分连词（and/or/也/并且），零依赖 |
+| ✅ MultiHop 策略 | 实体链/从句检测（X的Y），零依赖 |
+| ✅ Atomic 策略 | 子句提取（because/since/although），零依赖 |
+| ✅ LLM 策略 | OpenAI 兼容 API + SimpleSplit 降级 |
+| ✅ CLI 4 命令 | decompose / batch / bench / strategies |
+| ✅ --json 输出 | AI Agent 可解析 |
+| ✅ SKILL.md | Hermes Agent 技能定义 |
+| ✅ 开源基础设施 | LICENSE / CHANGELOG / README.en.md |
+
+**测试：** 34 个测试全部通过（1.62s）
+**Git:** `24f8263`
+
+## 经验教训（Round 10）
+
+1. **Product 骨架已完成所有任务**：本轮 PRD 所有验收标准已勾选，代码和测试已到位，Dev 只需确认状态并补齐交接文件
+2. **ready-for-deploy.md 必须每轮重新生成**：DevOps 完成后会清理，不能复用旧的
+
+*最后更新：2026-06-03*
+
+---
+
+## 本轮成果（Round 11 — 2026-round-11）
+
+### 项目：rag-decompose v0.2.0 — 质量迭代
+
+纯质量迭代，无新功能。修复所有工程债务。
+
+| 维度 | 修复前 | 修复后 | 说明 |
+|------|--------|--------|------|
+| 测试覆盖率 | 58% | 98% | 292 stmts, 仅 5 未覆盖 |
+| Ruff 错误 | 19 | 0 | 全部清理 |
+| 测试数量 | 34 | 91 | +57 新测试 |
+| cli.py 覆盖 | 0% | 100% | 直接函数调用替代 subprocess |
+| strategies.py 覆盖 | 72% | 98% | 补 LLM mock 测试 |
+| models.py 覆盖 | 96% | 100% | 补 BenchmarkResult 测试 |
+| 版本 | 0.1.0 | 0.2.0 | — |
+
+**文件变更：** 14 files, +854/-138 lines
+**Git:** `8cacf46`
+
+### 经验教训（Round 11）
+
+1. **subprocess 不贡献 pytest-cov**：CLI 测试必须用直接函数调用（import + mock sys.argv）才能计入覆盖率。subprocess 只能做集成测试
+2. **局部导入 mock 策略**：`from openai import OpenAI` 在函数内部时，不能用 `patch("module.OpenAI")`，需用 `patch.dict(sys.modules, {"openai": mock_module})` 注入 mock 模块
+3. **argparse --version 触发 SystemExit(0)**：测试时需用 `pytest.raises(SystemExit)` 包裹
+4. **Ruff --fix 自动修 import 排序**：手动修 I001 容易遗漏，`ruff check --fix` 一步到位
+
+*最后更新：2026-06-03*

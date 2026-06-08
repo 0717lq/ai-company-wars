@@ -8,6 +8,16 @@ build/
 # Node
 node_modules/
 .env
+.env.*
+
+# Secrets / tokens — 禁止入库
+tmp/
+*token*.txt
+*.token
+*secret*
+*credential*
+github_pat_*
+ghp_*
 
 # IDE
 .vscode/

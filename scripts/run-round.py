@@ -496,9 +496,10 @@ def cmd_check(args):
     if decision == "can_run":
         print(f"  ✅ 前置条件全部满足，允许执行")
         started_at = now_iso()
-        start_ms = now_ms()
 
         if not dry_run:
+            # set_role_status 会把 last_run 记为本时刻，供 complete 时计算 duration，
+            # 无需额外持久化 _start_ms（避免污染 status.json 且 complete 未走到时残留）
             set_role_status(team_status, role, "in_progress")
             write_json(status_path, team_status, dry_run=dry_run)
             write_last_run(
@@ -511,11 +512,6 @@ def cmd_check(args):
         print(f"  状态已更新为 in_progress")
         print(f"  请在 {role} 执行完成后调用:")
         print(f"    python3 scripts/run-round.py --team {team} --role {role} --round {round_id} --complete")
-
-        # 记录开始时间用于后续计算 duration
-        if not dry_run:
-            team_status["_start_ms"] = start_ms
-            write_json(status_path, team_status, dry_run=False)
 
     if dry_run:
         print(f"\n  [dry-run] 未写入任何文件")
@@ -635,7 +631,17 @@ def cmd_complete(args):
                 finished_at=finished_at,
                 dry_run=dry_run,
             )
-            print(f"  ✅ Judge 状态已更新: → {result}")
+            # Judge 是全局角色：同步回写两队 team status 的 judge 项，
+            # 避免 team 级 status 卡在 in_progress、current_state 与 round 脱节
+            for tm in ("red", "blue"):
+                tpath = team_status_path(tm)
+                tstat = read_json(tpath)
+                if tstat is None:
+                    continue
+                tstat.pop("_start_ms", None)
+                set_role_status(tstat, "judge", result, error=error_message)
+                write_json(tpath, tstat)
+            print(f"  ✅ Judge 状态已更新: → {result}（含两队 team status 同步）")
             if result == "failed" and error_data:
                 print(f"  ❌ 错误: [{error_data['code']}] {error_data['message']}")
             advance_round(round_data, team, dry_run=dry_run)
@@ -658,11 +664,21 @@ def cmd_complete(args):
         print(f"  ⚠️  当前角色状态是 {current_status}，不是 in_progress")
         print(f"     这可能是幂等检查后的正常跳过，或状态文件已被修改")
 
-    # 计算 duration
+    # 清理历史遗留的 _start_ms（旧版本污染，complete 未走到时会残留）
+    team_status.pop("_start_ms", None)
+
+    # 计算 duration：基于 in_progress 起始时间（role.last_run），不再依赖 _start_ms
     finished_at = now_iso()
-    finish_ms = now_ms()
-    start_ms = team_status.pop("_start_ms", None)
-    duration_ms = (finish_ms - start_ms) if start_ms else None
+    duration_ms = None
+    if current_status == "in_progress":
+        started_iso = role_data.get("last_run")
+        if started_iso:
+            try:
+                started_dt = datetime.fromisoformat(started_iso)
+                delta = datetime.now(timezone.utc) - started_dt
+                duration_ms = int(delta.total_seconds() * 1000)
+            except ValueError:
+                duration_ms = None
 
     # 错误信息（仅 failed）
     error_data = None

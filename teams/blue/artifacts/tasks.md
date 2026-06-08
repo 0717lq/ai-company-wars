@@ -1,70 +1,52 @@
-# Sprint 9 任务清单 — rag-builder v0.2.0
+# Sprint 11 任务清单 — rag-builder v0.4.0 质量打磨
 
-> 更新时间：2026-06-03
-> 项目：rag-builder
-> 团队：Blue
+> 本轮目标：修复裁判反馈的 3 个问题，零新功能，纯质量迭代。
 
----
+## P0 — 必须完成
 
-## P0（必须完成 — MVP 核心）
+### T1: 修复 vector_store.py N803 命名问题
+- **内容**：`_create_collection` 方法的 4 个参数（`Collection`, `CollectionSchema`, `DataType`, `FieldSchema`）改为小写（`collection_cls`, `collection_schema_cls`, `data_type_cls`, `field_schema_cls`）。同步更新所有调用处。
+- **预估**：15 分钟
+- **涉及文件**：`src/rag_builder/vector_store.py`
+- **验收**：`ruff check src/` 零 N803 错误
 
-### T1: Embedding 抽象层
-- **文件**: `src/rag_builder/embeddings.py`（新增）
-- **内容**: `EmbeddingProvider` 抽象基类 + `STProvider`（sentence-transformers）+ `OpenAIProvider`（OpenAI 兼容 API）+ `get_provider()` 工厂函数
-- **接口**: `embed_texts(texts: list[str]) -> list[list[float]]`，支持 batch_size、normalize、device 参数
-- **预估**: 150 行
+### T2: 提高 vector_store.py 测试覆盖率到 80%+
+- **内容**：为 `MilvusStore` 和 `ChromaStore` 补充单元测试，重点覆盖：
+  - `add_documents()` 成功/失败路径
+  - `search()` 各种参数组合
+  - `_create_collection()` mock 测试
+  - `__init__()` 异常处理（连接失败等）
+- **预估**：45 分钟
+- **涉及文件**：`tests/test_vector_store.py`
+- **验收**：`pytest tests/test_vector_store.py --cov=rag_builder.vector_store --cov-report=term-missing` 显示 ≥ 80%
 
-### T2: 向量存储连接器
-- **文件**: `src/rag_builder/vector_store.py`（新增）
-- **内容**: `VectorStore` 抽象基类 + `MilvusStore` + `ChromaStore` + `get_store()` 工厂函数
-- **接口**: `add(ids, texts, embeddings, metadata)` / `search(embedding, top_k)` / `delete(ids)` / `count()`
-- **预估**: 200 行
+### T3: 新增端到端集成测试
+- **内容**：创建 `tests/test_integration.py`，覆盖完整 RAG 流程：
+  - 配置验证 → scaffold 生成 → 文件创建 → 验证结构
+  - 嵌入生成 → 向量存储 → 检索 → 结果验证
+  - diagnose 命令完整执行
+  - benchmark 命令基本流程
+- **预估**：45 分钟
+- **涉及文件**：`tests/test_integration.py`
+- **验收**：≥ 5 个集成测试，全部通过
 
-### T3: 文档解析器
-- **文件**: `src/rag_builder/parsers.py`（新增）
-- **内容**: `parse_pdf(path)` → list[dict]（pymupdf）+ `parse_markdown(path)` → list[dict] + `parse_directory(path)` → list[dict] + `chunk_text(text, strategy, chunk_size, overlap)` 分块器
-- **预估**: 150 行
+## P1 — 体验完善
 
-### T4: 混合检索器
-- **文件**: `src/rag_builder/retriever.py`（新增）
-- **内容**: `HybridRetriever` 类，组合 BM25 + 向量检索，RRF 融合排序
-- **接口**: `index(documents)` / `search(query, top_k)` → list[dict]，可选 reranker
-- **预估**: 150 行
+### T4: 全量 Ruff 检查通过
+- **内容**：修复 T1 后运行 `ruff check src/ tests/`，确保零错误零警告。如有其他问题一并修复。
+- **预估**：15 分钟
+- **涉及文件**：视检查结果
+- **验收**：`ruff check src/ tests/` 输出 `All checks passed!`
 
-### T5: CLI 扩展 — ingest/query 子命令
-- **文件**: `src/rag_builder/cli.py`（更新）
-- **内容**: `rag-builder ingest <dir> --config <json>` 调用 parsers → embeddings → vector_store 完成入库；`rag-builder query "问题" --config <json>` 调用 retriever 完成检索
-- **预估**: 100 行增量
+### T5: 版本号升级 + CHANGELOG 更新
+- **内容**：`pyproject.toml` 版本号改为 `0.4.0`，CHANGELOG 追加 v0.4.0 条目（质量迭代：N803 修复、覆盖率提升、集成测试）。
+- **预估**：10 分钟
+- **涉及文件**：`pyproject.toml`, `CHANGELOG.md`
+- **验收**：`rag-builder --version` 输出 `0.4.0`
 
-### T6: 测试
-- **文件**: `tests/test_embeddings.py`, `tests/test_vector_store.py`, `tests/test_retriever.py`, `tests/test_parsers.py`（新增）+ `tests/test_cli.py`（更新）
-- **内容**: 每个新模块单元测试（mock 外部依赖），CLI 子命令集成测试
-- **预估**: 4 个新测试文件，≥ 60 个测试用例
+## P2 — 如果时间有余
 
----
-
-## P1（体验完善）
-
-### T7: 开源基础设施
-- **文件**: `LICENSE`（新增 MIT）、`CHANGELOG.md`（新增）、`README.en.md`（新增英文 README）
-- **内容**: 标准 MIT LICENSE、Keep a Changelog v0.2.0 条目、完整英文 README（Installation/Quick Start/CLI Reference/Architecture）
-
-### T8: SKILL.md 更新
-- **文件**: `SKILL.md`（更新）
-- **内容**: 新增"向量存储选型"、"Embedding 微调"、"生产部署"三章；更新快速决策树引用新 CLI 命令
-
-### T9: pyproject.toml 更新
-- **文件**: `pyproject.toml`（更新）
-- **内容**: 版本号 0.1.0→0.2.0，新增 optional-dependencies（milvus/chromadb/sentence-transformers），更新 keywords/classifiers
-
----
-
-## P2（锦上添花）
-
-### T10: docs/ 更新
-- **文件**: `docs/STRUCTURE.md`, `docs/FILES.md`, `docs/CODE.md`（更新）
-- **内容**: 反映 v0.2.0 新增模块
-
-### T11: 集成测试
-- **文件**: `tests/test_integration.py`（新增）
-- **内容**: 端到端测试：parse → chunk → embed（mock）→ store（mock）→ query → results
+### T6: README 补充质量指标
+- **内容**：在 README 中添加测试覆盖率 badge 和 Ruff badge，展示代码质量。
+- **预估**：10 分钟
+- **涉及文件**：`README.md`

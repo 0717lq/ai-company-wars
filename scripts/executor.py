@@ -7,7 +7,7 @@ ACW Executor — AI Company Wars 自动调度器 v2
   2. 红蓝双队并行执行同阶段角色
   3. 卡住检测（超时报警 + 自动重试）
   4. 两队完成后自动触发 Judge
-  5. P0: 死循环熔断（QA 连续失败自动标记 requires_human）
+  5. P0: 死循环熔断（dev 连续执行失败自动标记 requires_human）
   6. P1: Git push 自动化（token 检查 + 四步验证）
   7. P2: 自动推进 + 缓冲期（Judge 后自动开下一轮）
   8. P3: --preview 模式（PM→Dev→QA 跑通不 push 不 deploy）
@@ -59,9 +59,20 @@ STATE_TO_ROLE = {
     "JUDGING": "judge",
 }
 
+# 角色完成校验：相对 teams/{team}/ 的产物路径（支持 glob）。
+# 仅退出码为 0 不足以证明 Agent 真的干活，必须产出对应交接文件且本次执行后有更新。
+ROLE_OUTPUT_CHECK = {
+    "product": ["artifacts/handover-to-dev.md"],
+    "dev":     ["artifacts/ready-for-deploy.md"],
+    "devops":  ["artifacts/release-notes*.md"],
+    "growth":  ["project/README.md"],
+}
+
 # ── P0: 熔断器配置 ────────────────────────────────────────
 
-CIRCUIT_BREAKER_THRESHOLD = 3  # QA 连续失败 N 次触发熔断
+# dev 角色连续执行失败（退出码非0 或产物校验未通过）N 次触发熔断。
+# 注：JSON 字段沿用 consecutive_qa_failures 以兼容现有 status.json。
+CIRCUIT_BREAKER_THRESHOLD = 3
 
 # ── P2: 自动推进配置 ──────────────────────────────────────
 
@@ -110,6 +121,62 @@ def write_json(path, data):
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+# ── Secret 扫描（防止 token 被自动管道提交） ──────────────
+
+import re
+
+# 命中即视为疑似泄露：GitHub PAT / classic token / 通用 token 赋值
+SECRET_PATTERNS = [
+    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"ghp_[A-Za-z0-9]{20,}"),
+    re.compile(r"gho_[A-Za-z0-9]{20,}"),
+]
+
+
+def scan_staged_for_secrets(project_dir: str) -> tuple[bool, str]:
+    """扫描已暂存(git diff --cached)的内容是否含疑似 token。
+    返回 (found, detail)。found=True 表示命中，应中止提交。"""
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--cached"],
+            capture_output=True, text=True, timeout=30, cwd=project_dir,
+        )
+    except Exception as e:
+        # 扫描失败时保守中止，避免漏网
+        return True, f"secret 扫描失败(保守中止): {e}"
+
+    diff = proc.stdout
+    for pat in SECRET_PATTERNS:
+        m = pat.search(diff)
+        if m:
+            # 只回报匹配类型与前 8 位，绝不打印完整 token
+            hit = m.group(0)[:8]
+            return True, f"暂存区疑似含 token (模式 {pat.pattern[:12]}…, 前缀 {hit}…)"
+    return False, ""
+
+
+def scan_unpushed_for_secrets(project_dir: str) -> tuple[bool, str]:
+    """扫描即将 push 的 commit 范围(origin/main..HEAD)是否含疑似 token。
+    返回 (found, detail)。无 upstream 或扫描异常时保守中止。"""
+    try:
+        proc = subprocess.run(
+            ["git", "log", "origin/main..HEAD", "-p"],
+            capture_output=True, text=True, timeout=30, cwd=project_dir,
+        )
+    except Exception as e:
+        return True, f"unpushed secret 扫描失败(保守中止): {e}"
+
+    diff = proc.stdout
+    if not diff.strip():
+        return False, ""
+    for pat in SECRET_PATTERNS:
+        m = pat.search(diff)
+        if m:
+            hit = m.group(0)[:8]
+            return True, f"待 push 的 commit 疑似含 token (模式 {pat.pattern[:12]}…, 前缀 {hit}…)"
+    return False, ""
 
 
 # ── 状态查询 ──────────────────────────────────────────────
@@ -190,8 +257,8 @@ def get_circuit_breaker(team: str) -> dict:
     })
 
 
-def update_circuit_breaker(team: str, qa_success: bool):
-    """更新熔断器：QA 成功则归零，失败则累加"""
+def update_circuit_breaker(team: str, dev_success: bool):
+    """更新熔断器：dev 执行成功则归零，失败则累加"""
     ts = get_team_status(team)
     if ts is None:
         return
@@ -203,13 +270,13 @@ def update_circuit_breaker(team: str, qa_success: bool):
         "reason": None,
     })
 
-    if qa_success:
+    if dev_success:
         cb["consecutive_qa_failures"] = 0
     else:
         cb["consecutive_qa_failures"] += 1
         if cb["consecutive_qa_failures"] >= cb["threshold"]:
             cb["blocked"] = True
-            cb["reason"] = f"QA 连续失败 {cb['consecutive_qa_failures']} 次，触发熔断"
+            cb["reason"] = f"dev 连续执行失败 {cb['consecutive_qa_failures']} 次，触发熔断"
             log(f"🔥 [{team}] 熔断触发: {cb['reason']}")
 
     ts["circuit_breaker"] = cb
@@ -369,6 +436,14 @@ def auto_push(team: str, round_id: str, dry_run: bool = False) -> dict:
         log(f"[{team}/push] ✅ {result['reason']}")
         return result
 
+    # 🔒 secret 门禁：push 前扫描待推送的 commit，命中 token 立即中止
+    sec_found, sec_detail = scan_unpushed_for_secrets(project_dir)
+    if sec_found:
+        result["skipped"] = True
+        result["reason"] = f"检测到疑似 secret，已中止 push: {sec_detail}"
+        log(f"[{team}/push] 🛑 {result['reason']}")
+        return result
+
     # Step 4: push（token 嵌入 URL，git 原生不读环境变量）
     original_url = ""
     try:
@@ -430,6 +505,40 @@ def auto_push(team: str, round_id: str, dry_run: bool = False) -> dict:
     return result
 
 
+# ── 角色产物校验 ──────────────────────────────────────────
+
+import glob as _glob
+
+
+def verify_role_output(team: str, role: str, start_ts: float) -> tuple[bool, str]:
+    """校验角色是否真的产出了关键交接文件（防 Agent 空转记成功）。
+    要求：对应产物存在，且至少一个文件 mtime >= start_ts（本次执行后有更新）。
+    返回 (ok, detail)。无校验规则的角色直接通过。"""
+    patterns = ROLE_OUTPUT_CHECK.get(role)
+    if not patterns:
+        return True, "无产物校验规则"
+
+    team_dir = os.path.join(BASE_DIR, "teams", team)
+    matched_any = False
+    fresh_any = False
+    for pat in patterns:
+        hits = _glob.glob(os.path.join(team_dir, pat))
+        if hits:
+            matched_any = True
+            for h in hits:
+                try:
+                    if os.path.getmtime(h) >= start_ts - 1:  # 容 1s 误差
+                        fresh_any = True
+                        break
+                except OSError:
+                    continue
+    if not matched_any:
+        return False, f"缺少产物 {patterns}（Agent 可能未真正执行）"
+    if not fresh_any:
+        return False, f"产物 {patterns} 存在但本次未更新（疑似空转）"
+    return True, "产物校验通过"
+
+
 # ── 执行单个角色 ──────────────────────────────────────────
 
 def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
@@ -446,7 +555,7 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
     """
     result = {"team": team, "role": role, "success": False, "duration_s": 0, "error": None}
 
-    # P0: 熔断检查（dev 角色执行前检查 QA 是否熔断）
+    # P0: 熔断检查（dev 角色执行前检查是否已熔断）
     if role == "dev":
         blocked, reason = check_circuit_breaker(team)
         if blocked:
@@ -523,6 +632,8 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
     ROUND_CONTEXT = {
         "2026-round-8": "本轮方向：开发一个 RAG（检索增强生成）相关的 Hermes Agent 技能。技能应帮助用户构建或优化 RAG 系统，例如：PDF 解析、向量检索、混合检索、Reranker 精排、查询分解等。产出是一个完整的 SKILL.md 文件，可直接安装到 Hermes Agent 使用。",
         "2026-round-9": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始，蓝队在已有 rag-builder 基础上优化。红队项目路径 teams/red/project/ 是空目录，需要从零搭建。蓝队项目路径 teams/blue/project/ 已有 rag-builder 代码，在此基础上迭代优化。两队都产出完整的 SKILL.md + Python 工具包。",
+        "2026-round-10": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始（teams/red/project/ 是空目录），蓝队优化已有 rag-builder（teams/blue/project/ 已有代码）。红队目标：创建一个新的 RAG 技能，例如专注 PDF 解析或查询分解。蓝队目标：在 rag-builder 基础上增加功能或修复问题。完成后立即停止，不要循环。",
+        "2026-round-11": "本轮方向：优化迭代。红队优化 rag-decompose（修复测试覆盖率 58%→80%+、清理 Ruff 问题、提升代码质量），蓝队优化 rag-builder（修复 N803 命名问题、提高 vector_store.py 覆盖率、增加集成测试）。两队都在已有代码基础上迭代，不要重写。完成后立即停止。",
     }
     round_context = ROUND_CONTEXT.get(round_id, "")
 
@@ -533,12 +644,22 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
 
 {round_context}
 
-请加载 {skill} 技能并执行你的职责。{extra}"""
+请加载 {skill} 技能并执行你的职责。
+
+⚠️ 重要规则（必须遵守）：
+1. 完成任务后立即停止。不要循环修改、不要反复运行测试。
+2. 🔴 端到端验证（必须）：代码写完 + 单元测试通过后，必须用真实数据跑一遍证明功能能用。
+   - 写一个 demo.py 或在测试中包含端到端测试
+   - 用真实输入调用核心功能，打印输出
+   - 验证输出是合理的（不是空的、不是报错）
+   - 把验证结果写入 verification.md（记录输入、输出、是否通过）
+3. 验证不通过就不算完成，继续修直到通过。
+4. 验证通过后立即停止，不要做额外的事情。{extra}"""
 
     try:
         exec_proc = subprocess.run(
             ["hermes", "chat", "-s", skill, "-q", prompt],
-            capture_output=True, text=True, timeout=900,
+            capture_output=True, text=True, timeout=1800,
             cwd=BASE_DIR,
         )
         duration = time.time() - start
@@ -548,7 +669,7 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
             result["error"] = f"hermes chat 退出码 {exec_proc.returncode}: {exec_proc.stderr[-300:]}"
             log(f"[{team}/{role}] ❌ 执行失败 ({duration:.0f}s): {result['error'][:100]}")
             _complete_role(team, role, round_id, "failed", result["error"])
-            # P0: 更新熔断器（QA 失败时累加）
+            # P0: 更新熔断器（dev 失败时累加）
             if role == "dev":
                 update_circuit_breaker(team, False)
             return result
@@ -558,18 +679,28 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
         result["duration_s"] = round(duration, 1)
         result["error"] = f"执行超时 ({duration:.0f}s)"
         log(f"[{team}/{role}] ❌ 执行超时")
-        _complete_role(team, role, round_id, "failed", "执行超时 900s")
+        _complete_role(team, role, round_id, "failed", "执行超时 1800s")
+        if role == "dev":
+            update_circuit_breaker(team, False)
+        return result
+
+    # Step 2.5: 产物校验（退出码 0 不等于真的干活）
+    ok, detail = verify_role_output(team, role, start)
+    if not ok:
+        result["error"] = f"产物校验失败: {detail}"
+        log(f"[{team}/{role}] ❌ 退出码0但{detail}，判定 failed")
+        _complete_role(team, role, round_id, "failed", result["error"])
         if role == "dev":
             update_circuit_breaker(team, False)
         return result
 
     # Step 3: 回写完成
-    log(f"[{team}/{role}] 执行完成 ({duration:.0f}s)，回写状态...")
+    log(f"[{team}/{role}] 执行完成 ({duration:.0f}s)，{detail}，回写状态...")
     _complete_role(team, role, round_id, "completed")
     result["success"] = True
     log(f"[{team}/{role}] ✅ 完成")
 
-    # P0: QA 成功时归零熔断器
+    # P0: dev 成功时归零熔断器
     if role == "dev":
         update_circuit_breaker(team, True)
 
@@ -791,13 +922,23 @@ def _sync_main_repo(round_id: str):
     """轮次结束后自动 commit + push 主仓库"""
     log("📦 同步主仓库到 GitHub...")
     try:
-        # git add -A
-        subprocess.run(["git", "add", "-A"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+        # 显式只添加运营产物目录，绝不用 git add -A（避免 tmp/、token 等意外入库）
+        SYNC_PATHS = ["teams", "shared", "runtime", "logs", "scripts",
+                      "README.md", "*.md", ".gitignore"]
+        subprocess.run(["git", "add", "--", *SYNC_PATHS],
+                       capture_output=True, text=True, timeout=15, cwd=BASE_DIR)
 
-        # 检查是否有变更
-        proc = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+        # 检查是否有变更（仅看已暂存的）
+        proc = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
         if not proc.stdout.strip():
             log("📦 主仓库无变更，跳过")
+            return
+
+        # 🔒 secret 门禁：提交前扫描暂存内容，命中 token 立即中止
+        found, detail = scan_staged_for_secrets(BASE_DIR)
+        if found:
+            log(f"📦 🛑 检测到疑似 secret，已中止主仓库提交: {detail}")
+            log("📦 请清理暂存区后重试（git reset 取消暂存对应文件）")
             return
 
         # git commit
@@ -823,8 +964,13 @@ def _sync_main_repo(round_id: str):
         else:
             auth_url = original_url
 
+        # 动态获取当前分支名（不再硬编码 master/main）
+        branch_proc = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                     capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
+        branch = branch_proc.stdout.strip() or "main"
+
         subprocess.run(["git", "remote", "set-url", "origin", auth_url], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
-        push_proc = subprocess.run(["git", "push", "origin", "master"], capture_output=True, text=True, timeout=120, cwd=BASE_DIR)
+        push_proc = subprocess.run(["git", "push", "origin", branch], capture_output=True, text=True, timeout=120, cwd=BASE_DIR)
         subprocess.run(["git", "remote", "set-url", "origin", original_url], capture_output=True, text=True, timeout=10, cwd=BASE_DIR)
 
         if push_proc.returncode == 0:
@@ -946,7 +1092,7 @@ def show_status():
         if cb.get("blocked"):
             print(f"    🔥 熔断: {cb.get('reason', 'unknown')}")
         elif cb.get("consecutive_qa_failures", 0) > 0:
-            print(f"    ⚡ QA 失败计数: {cb['consecutive_qa_failures']}/{cb.get('threshold', 3)}")
+            print(f"    ⚡ dev 失败计数: {cb['consecutive_qa_failures']}/{cb.get('threshold', 3)}")
 
         print()
 

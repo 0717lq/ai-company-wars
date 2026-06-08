@@ -31,6 +31,8 @@
 | v0.5.0 | 2026-05-31 | fclean | Production Pipeline (PyPI/Docker/Pre-commit/.fcleanignore/watch) + Stats Visualization (--chart/--top)、测试 176→238 |
 | v0.6.0 | 2026-06-01 | fclean | Plugin System (PluginBase+PluginManager) + CLI架构重构(1331→3模块) + Ruff 7套规则、测试 238→273 |
 | v0.1.0 | 2026-06-03 | rag-builder (RAG Builder Skill) | RAG pipeline 构建指南+工具包。SKILL.md 12章节、config_schema/scaffold/benchmark/cli、78测试 |
+| v0.3.0 | 2026-06-03 | rag-builder | diagnose 命令（4维检查）、SKILL.md 拆分（774→221行+6个references）、batch bug 修复、172测试 |
+| v0.4.0 | 2026-06-03 | rag-builder | N803命名修复、vector_store 100%覆盖率、集成测试14个、207测试 |
 
 ## 环境问题
 

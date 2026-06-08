@@ -62,6 +62,24 @@
 - **commit**: `68eba88` — push 被安全扫描拦截，需手动推送
 - **双语一致性**: 中英文 README 同步更新所有变更
 
+### 2026-06-03 — Round 10: rag-decompose README 全面优化
+- **新项目**: rag-decompose（RAG 查询分解 CLI），从零搭建的 RAG 技能
+- **README 全面重写**: Hero 区 + 终端演示（3 个真实 CLI 输出）+ 场景对比表 + 竞品对比表（vs LangChain/LlamaIndex）+ 贡献指南
+- **双语同步**: 中文 README.md + 英文 README.en.md 全量翻译，结构完全一致
+- **SEO 迭代**: pyproject.toml 追加 7 个关键词（nlp/information-retrieval/search-optimization/document-retrieval/llm/benchmark/zero-dependency）+ Changelog URL
+- **badge**: 测试计数 badge（34 passed）+ 动态 PyPI 版本 badge
+- **commit**: `7d6c9ae` — push 成功
+- **GitHub Topics**: PAT 权限不足（403），需用户手动设置 12 个推荐标签
+- **教训**: Runner blocked 需 --retry 重置；Topics API 需 repository administration 权限
+
+### 2026-06-03 — Round 11: rag-decompose v0.2.0 质量型 Release 推广
+- **质量型 Release README 策略**: v0.2.0 是纯质量提升（测试覆盖率 58%→98%, Ruff 19→0），不硬凑新功能。用"改进项 + 说明 + 对用户的价值"三列质量型表格，把底层优化翻译成用户收益
+- **badge 同步**: tests badge 34→91, 新增 coverage 98% badge（中英文同步）
+- **v0.2.0 tag 补打**: 之前只有 v0.1.0，本轮补打 annotated tag
+- **SEO 迭代**: pyproject.toml 追加 code-quality/test-coverage/ruff/linting/query-splitting
+- **commit**: `94ed6cc` — push 超时（WSL 网络），需 DevOps 手动推送
+- **双语一致性**: 中英文 README 所有变更完全同步
+
 ## 技能清单
 
 - README 优化（标题、badge、功能列表、对比表、贡献指南）

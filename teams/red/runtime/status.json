@@ -1,46 +1,45 @@
 {
-  "round_id": "2026-round-9",
+  "round_id": "2026-round-11",
   "team": "red",
-  "current_state": "in_progress",
+  "current_state": "completed",
   "roles": {
     "product": {
       "status": "completed",
-      "last_run": "2026-06-03T05:55:49.092637+00:00",
+      "last_run": "2026-06-03T10:38:25.737309+00:00",
       "error": null,
       "outputs": []
     },
     "dev": {
-      "status": "failed",
-      "last_run": "2026-06-03T06:15:00.954934+00:00",
-      "error": "执行超时 900s",
+      "status": "completed",
+      "last_run": "2026-06-03T10:48:21.029435+00:00",
+      "error": null,
       "outputs": []
     },
     "devops": {
-      "status": "blocked",
-      "last_run": "2026-06-03T06:15:01.128524+00:00",
-      "error": "前置角色 dev 已失败，本轮无接力条件",
+      "status": "completed",
+      "last_run": "2026-06-03T10:53:51.111144+00:00",
+      "error": null,
       "outputs": []
     },
     "growth": {
-      "status": "blocked",
-      "last_run": "2026-06-03T06:15:01.261849+00:00",
-      "error": "前置角色 devops 被阻塞",
+      "status": "completed",
+      "last_run": "2026-06-03T10:59:16.221864+00:00",
+      "error": null,
       "outputs": []
     },
     "judge": {
-      "status": "in_progress",
-      "last_run": "2026-06-03T06:15:01.409987+00:00",
+      "status": "completed",
+      "last_run": "2026-06-03T11:02:44.819287+00:00",
       "error": null,
       "outputs": []
     }
   },
   "circuit_breaker": {
-    "consecutive_qa_failures": 1,
+    "consecutive_qa_failures": 0,
     "threshold": 3,
     "blocked": false,
     "reason": null
   },
   "latest_artifacts": {},
-  "updated_at": "2026-06-03T06:15:01.409997+00:00",
-  "_start_ms": 1780467301409
+  "updated_at": "2026-06-03T11:02:44.819295+00:00"
 }
