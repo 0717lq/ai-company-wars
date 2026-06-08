@@ -30,10 +30,15 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 
+# 共享 token 模块（与脚本同目录）
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import github_auth
+
 # ── 路径常量 ──────────────────────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUND_JSON = os.path.join(BASE_DIR, "runtime", "round.json")
+ROUND_CONFIG = os.path.join(BASE_DIR, "runtime", "round-config.json")
 RUNNER = os.path.join(BASE_DIR, "scripts", "run-round.py")
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
@@ -310,48 +315,12 @@ def reset_circuit_breaker(team: str):
 # ── P1: Git push 自动化 ──────────────────────────────────
 
 def check_github_token() -> tuple[bool, str]:
-    """检查 GitHub token 是否有效"""
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN_Classic")
+    """检查 GitHub token 是否有效。成功返回 (True, token)，失败返回 (False, 原因)。"""
+    token = github_auth.get_token()
     if not token:
-        # 尝试从 .env 文件读取
-        env_file = os.path.expanduser("~/.hermes/.env")
-        if os.path.exists(env_file):
-            for line in open(env_file):
-                if line.startswith("GITHUB_TOKEN=") and not line.startswith("#"):
-                    token = line.strip().split("=", 1)[1]
-                    break
-    if not token:
-        # 尝试从 Windows 环境变量读取
-        try:
-            proc = subprocess.run(
-                ["powershell.exe", "-Command", "[Environment]::GetEnvironmentVariable('GITHUB_TOKEN_Classic', 'User')"],
-                capture_output=True, text=True, timeout=10,
-            )
-            token = proc.stdout.strip().replace("\r", "").replace("\n", "")
-        except Exception:
-            pass
-
-    if not token:
-        return False, "未找到 GitHub token (GITHUB_TOKEN / GITHUB_TOKEN_Classive)"
-
-    # 验证 token 有效性
-    try:
-        proc = subprocess.run(
-            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-             "-H", f"Authorization: token {token}", f"{GITHUB_API}/user"],
-            capture_output=True, text=True, timeout=15,
-        )
-        code = proc.stdout.strip()
-        if code == "200":
-            return True, token
-        elif code == "401":
-            return False, "GitHub token 无效 (401 Unauthorized)"
-        elif code == "403":
-            return False, "GitHub API rate limit 或权限不足 (403)"
-        else:
-            return False, f"GitHub API 返回 {code}"
-    except Exception as e:
-        return False, f"GitHub API 检查失败: {e}"
+        return False, "未找到 GitHub token (GITHUB_TOKEN / ~/.hermes/.env / Windows 环境变量)"
+    ok, msg = github_auth.validate_token(token)
+    return (True, token) if ok else (False, f"GitHub token {msg}")
 
 
 def check_git_remote(project_dir: str) -> tuple[bool, str]:
@@ -510,6 +479,14 @@ def auto_push(team: str, round_id: str, dry_run: bool = False) -> dict:
 import glob as _glob
 
 
+def _load_round_context(round_id: str) -> str:
+    """从 runtime/round-config.json 读取本轮项目方向；缺失则返回空串。"""
+    cfg = read_json(ROUND_CONFIG)
+    if not cfg:
+        return ""
+    return cfg.get("rounds", {}).get(round_id, "")
+
+
 def verify_role_output(team: str, role: str, start_ts: float) -> tuple[bool, str]:
     """校验角色是否真的产出了关键交接文件（防 Agent 空转记成功）。
     要求：对应产物存在，且至少一个文件 mtime >= start_ts（本次执行后有更新）。
@@ -628,14 +605,8 @@ def run_role(team: str, role: str, round_id: str, dry_run: bool = False,
     log(f"[{team}/{role}] 执行中 (skill: {skill}){'[preview]' if preview else ''}...")
     start = time.time()
 
-    # 轮次上下文（每轮不同的项目方向）
-    ROUND_CONTEXT = {
-        "2026-round-8": "本轮方向：开发一个 RAG（检索增强生成）相关的 Hermes Agent 技能。技能应帮助用户构建或优化 RAG 系统，例如：PDF 解析、向量检索、混合检索、Reranker 精排、查询分解等。产出是一个完整的 SKILL.md 文件，可直接安装到 Hermes Agent 使用。",
-        "2026-round-9": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始，蓝队在已有 rag-builder 基础上优化。红队项目路径 teams/red/project/ 是空目录，需要从零搭建。蓝队项目路径 teams/blue/project/ 已有 rag-builder 代码，在此基础上迭代优化。两队都产出完整的 SKILL.md + Python 工具包。",
-        "2026-round-10": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始（teams/red/project/ 是空目录），蓝队优化已有 rag-builder（teams/blue/project/ 已有代码）。红队目标：创建一个新的 RAG 技能，例如专注 PDF 解析或查询分解。蓝队目标：在 rag-builder 基础上增加功能或修复问题。完成后立即停止，不要循环。",
-        "2026-round-11": "本轮方向：优化迭代。红队优化 rag-decompose（修复测试覆盖率 58%→80%+、清理 Ruff 问题、提升代码质量），蓝队优化 rag-builder（修复 N803 命名问题、提高 vector_store.py 覆盖率、增加集成测试）。两队都在已有代码基础上迭代，不要重写。完成后立即停止。",
-    }
-    round_context = ROUND_CONTEXT.get(round_id, "")
+    # 轮次上下文（每轮不同的项目方向，外置到 runtime/round-config.json）
+    round_context = _load_round_context(round_id)
 
     prompt = f"""你是 AI Company Wars 的 {role} 角色。
 队伍: {team}
@@ -982,25 +953,8 @@ def _sync_main_repo(round_id: str):
 
 
 def _get_token() -> str:
-    """获取 GitHub token"""
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN_Classic")
-    if not token:
-        env_file = os.path.expanduser("~/.hermes/.env")
-        if os.path.exists(env_file):
-            for line in open(env_file):
-                if line.startswith("GITHUB_TOKEN=") and not line.startswith("#"):
-                    token = line.strip().split("=", 1)[1]
-                    break
-    if not token:
-        try:
-            proc = subprocess.run(
-                ["powershell.exe", "-Command", "[Environment]::GetEnvironmentVariable('GITHUB_TOKEN_Classic', 'User')"],
-                capture_output=True, text=True, timeout=10,
-            )
-            token = proc.stdout.strip().replace("\r", "").replace("\n", "")
-        except Exception:
-            pass
-    return token or ""
+    """获取 GitHub token（委托共享模块）"""
+    return github_auth.get_token()
 
 
 def _force_advance_round(round_data: dict):

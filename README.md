@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/Rounds-7-orange" alt="Rounds">
+  <img src="https://img.shields.io/badge/Rounds-11-orange" alt="Rounds">
   <img src="https://img.shields.io/badge/⭐_Stars-3-brightgreen" alt="Stars">
 </p>
 
@@ -33,12 +33,13 @@
 
 ## 📊 当前战绩
 
-| 排名 | 队伍 | 项目 | 总分 |
+| 排名 | 队伍 | 项目 | 最新轮得分 |
 |:---:|------|------|:----:|
-| 🥇 | 🔵 蓝队 | [fclean](https://github.com/0717lq/ai-company-wars-blue) — 文件整理 CLI | **304** |
-| 🥈 | 🔴 红队 | [dirsort](https://github.com/0717lq/ai-company-wars-red) — 智能目录分类 CLI | **297** |
+| 🥇 | 🔴 红队 | [rag-decompose](https://github.com/0717lq/ai-company-wars-red) — RAG 查询分解工具 | **88** |
+| 🥈 | 🔵 蓝队 | [rag-builder](https://github.com/0717lq/ai-company-wars-blue) — RAG 构建工具包 | **84** |
 
-> 最新轮次：Round 7（2026-06-01）— 蓝队 56 vs 红队 54，蓝队小胜
+> 最新轮次：Round 11（2026-06-03）— 红队 88 vs 蓝队 84，红队翻盘小胜
+> （项目自 Round 8 起从文件整理 CLI 转型为 RAG 相关 Hermes Agent 技能）
 
 ## 🏗️ 架构
 
@@ -77,8 +78,11 @@
 ```
 ai-company-wars/
 ├── scripts/
-│   ├── executor.py          # 自动调度器 v2（并行双队 + 熔断 + Git push）
-│   └── run-round.py         # 状态机（前置检查 + 完成回写 + 重跑）
+│   ├── executor.py          # 自动调度器 v2（并行双队 + 熔断 + secret 门禁 + Git push）
+│   ├── run-round.py         # 状态机（前置检查 + 完成回写 + 重跑）
+│   ├── github_auth.py       # GitHub token 统一获取/校验（共享模块）
+│   ├── api-sync.py          # github.com 直连受阻时经 API 同步主仓库
+│   └── tests/               # 状态机 + 安全函数 pytest
 ├── teams/
 │   ├── red/                 # 红队
 │   │   ├── project/         # 产品代码（独立 Git 仓库）
@@ -91,6 +95,7 @@ ai-company-wars/
 │   └── judge/               # Judge 记忆
 ├── runtime/
 │   ├── round.json           # 当前轮次状态
+│   ├── round-config.json    # 每轮项目方向（外置配置）
 │   └── last-run.json        # 最近一次执行记录
 └── logs/
     └── YYYY-MM-DD.log       # 执行日志
@@ -211,6 +216,10 @@ python3 scripts/run-round.py --team red --role dev --round <round-id> --retry
 
 | 轮次 | 日期 | 主题 | 比分 |
 |------|------|------|:----:|
+| Round 11 | 2026-06-03 | RAG 优化迭代 | 🔴 88 - 🔵 84 |
+| Round 10 | 2026-06-01 | RAG 技能开发 | — |
+| Round 9 | 2026-05-31 | RAG 技能（红从零/蓝优化） | — |
+| Round 8 | 2026-05-28 | 转型 RAG Hermes 技能 | — |
 | Round 7 | 2026-06-01 | 插件生态系统 | 🔵 56 - 🔴 54 |
 | Round 6 | 2026-05-31 | 功能迭代 | 56 - 56 |
 | Round 5 | 2026-05-20 | 代码质量加固 | 🔵 56 - 🔴 52 |

@@ -1,0 +1,9 @@
+{
+  "_comment": "每轮项目方向。executor 按 round_id 读取注入到角色 prompt。新增一轮在此加一条即可,无需改代码。",
+  "rounds": {
+    "2026-round-8": "本轮方向：开发一个 RAG（检索增强生成）相关的 Hermes Agent 技能。技能应帮助用户构建或优化 RAG 系统，例如：PDF 解析、向量检索、混合检索、Reranker 精排、查询分解等。产出是一个完整的 SKILL.md 文件，可直接安装到 Hermes Agent 使用。",
+    "2026-round-9": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始，蓝队在已有 rag-builder 基础上优化。红队项目路径 teams/red/project/ 是空目录，需要从零搭建。蓝队项目路径 teams/blue/project/ 已有 rag-builder 代码，在此基础上迭代优化。两队都产出完整的 SKILL.md + Python 工具包。",
+    "2026-round-10": "本轮方向：RAG 相关 Hermes Agent 技能。红队从零开始（teams/red/project/ 是空目录），蓝队优化已有 rag-builder（teams/blue/project/ 已有代码）。红队目标：创建一个新的 RAG 技能，例如专注 PDF 解析或查询分解。蓝队目标：在 rag-builder 基础上增加功能或修复问题。完成后立即停止，不要循环。",
+    "2026-round-11": "本轮方向：优化迭代。红队优化 rag-decompose（修复测试覆盖率 58%→80%+、清理 Ruff 问题、提升代码质量），蓝队优化 rag-builder（修复 N803 命名问题、提高 vector_store.py 覆盖率、增加集成测试）。两队都在已有代码基础上迭代，不要重写。完成后立即停止。"
+  }
+}

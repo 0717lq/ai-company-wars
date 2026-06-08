@@ -36,6 +36,9 @@ import sys
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import github_auth
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 疑似 token 模式（push 前扫描）
@@ -44,33 +47,6 @@ SECRET_PATTERNS = [
     re.compile(r"ghp_[A-Za-z0-9]{20,}"),
     re.compile(r"gho_[A-Za-z0-9]{20,}"),
 ]
-
-
-def get_token() -> str:
-    """按优先级获取 GitHub token：环境变量 → ~/.hermes/.env → Windows 用户环境变量。"""
-    tok = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if tok:
-        return tok.strip()
-
-    env_file = os.path.expanduser("~/.hermes/.env")
-    if os.path.exists(env_file):
-        for line in open(env_file, encoding="utf-8"):
-            if line.startswith("GITHUB_TOKEN=") and not line.startswith("#"):
-                return line.strip().split("=", 1)[1].strip()
-
-    # WSL：从 Windows 用户环境变量读
-    try:
-        proc = subprocess.run(
-            ["powershell.exe", "-Command",
-             "[Environment]::GetEnvironmentVariable('GITHUB_TOKEN','User')"],
-            capture_output=True, text=True, timeout=10,
-        )
-        tok = proc.stdout.strip().replace("\r", "").replace("\n", "")
-        if tok:
-            return tok
-    except Exception:
-        pass
-    return ""
 
 
 def detect_repo() -> str:
@@ -148,7 +124,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="只算变更不提交")
     args = ap.parse_args()
 
-    token = get_token()
+    token = github_auth.get_token()
     if not token:
         raise SystemExit("❌ 未找到 GitHub token（GITHUB_TOKEN / ~/.hermes/.env / Windows 环境变量）")
 

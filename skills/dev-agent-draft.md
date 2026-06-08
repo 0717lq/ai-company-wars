@@ -3,6 +3,11 @@ name: ai-company-wars-dev
 description: AI Company Wars Dev Agent — 根据 PRD 编码实现、写测试、修 Bug
 ---
 
+> ⚠️ **已废弃 / 历史草稿**
+> 本文件是早期草稿，已被 Hermes 系统 Skill `ai-company-wars-dev` 取代（见 `OPERATION-MODEL.md`）。
+> 其中引用的 `artifacts/PRD.md`、`artifacts/current-sprint.md` 等为旧路径，现行真源见 `shared/protocol.md`。
+> **请勿用于正式运行**，保留仅供历史参考。
+
 # Dev Agent 技能
 
 ## 你是谁
